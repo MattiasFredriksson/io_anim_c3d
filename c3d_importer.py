@@ -1,4 +1,25 @@
 
+import mathutils
+
+def load(operator, context, filepath="",
+         use_manual_orientation=False,
+         axis_forward='-Z',
+         axis_up='Y',
+         global_scale=1.0):
+    from bpy_extras.io_utils import axis_conversion
+
+    # World orientation adjustment
+    if use_manual_orientation:
+        global_orientation = axis_conversion(from_forward=axis_forward, from_up=axis_up).to_4x4()
+    else:
+        global_orientation = mathutils.Matrix.Identity(4)
+    global_orientation = global_orientation @ mathutils.Matrix.Scale(global_scale, 4)
+
+
+    print(global_orientation)
+
+
+
 def validate_blend_names(name):
     assert(type(name) == bytes)
     # Blender typically does not accept names over 63 bytes...
