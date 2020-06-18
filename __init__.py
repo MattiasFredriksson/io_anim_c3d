@@ -40,6 +40,10 @@ if "bpy" in locals():
     import importlib
     if "c3d_importer" in locals():
         importlib.reload(c3d_importer)
+    if "c3d_parse_dictionary" in locals():
+        importlib.reload(c3d_parse_dictionary)
+    if "c3d" in locals():
+        importlib.reload(c3d)
 
 from bpy.props import (
         StringProperty,
@@ -92,6 +96,12 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
             min=0.001, max=1000.0,
             default=1.0,
             )
+    max_residual: FloatProperty(
+        name="Maximum Residual", default=0.0,
+        description="Ignore data samples with a residual greater then specified value.",
+        min=-1., max=1000000.0,
+        soft_min=-1., soft_max=100.0,
+    )
 
     def draw(self, context):
         pass

@@ -1,12 +1,25 @@
 
 import mathutils
 
+if "bpy" in locals():
+    import importlib
+    if "c3d_importer" in locals():
+        importlib.reload(c3d_importer)
+    if "c3d_parse_dictionary" in locals():
+        importlib.reload(c3d_parse_dictionary)
+    if "c3d" in locals():
+        importlib.reload(c3d)
+
+
 def load(operator, context, filepath="",
          use_manual_orientation=False,
          axis_forward='-Z',
          axis_up='Y',
-         global_scale=1.0):
+         global_scale=1.0,
+         print_file=True):
+    import numpy as np
     from bpy_extras.io_utils import axis_conversion
+    from .c3d_parse_dictionary import C3DParseDictionary
 
     # World orientation adjustment
     if use_manual_orientation:
@@ -16,7 +29,49 @@ def load(operator, context, filepath="",
     global_orientation = global_orientation @ mathutils.Matrix.Scale(global_scale, 4)
 
 
-    print(global_orientation)
+
+
+    parser = C3DParseDictionary(filepath)
+
+    if print_file:
+        parser.printFile()
+
+    labels = parser.parseLabels('POINT')
+    nlabels = len(labels)
+
+    # Number of frames [first, last] => +1
+    # first_frame is the frame index to start parsing from
+    # nframes is the number of frames to parse
+    first_frame = parser.reader.header.first_frame + 1
+    nframes = parser.reader.header.last_frame - first_frame + 1
+
+    frames = np.zeros([nframes, len(labels), 3], dtype=np.float64)
+    occluded = np.zeros([nframes, len(labels)], dtype=np.bool)
+    occluded = np.zeros([nframes, len(labels)], dtype=np.bool)
+
+    for i, points, analog in parser.reader.read_frames():
+        print(points.shape)
+        #OpticalTrackerMotion.verify(i, points)
+        index = i - first_frame
+        # Ignore any frames outside parsed timeline
+        if index < 0 and index >= nframes:
+            continue # Not parsed
+        # Extract column: 0,1,2
+        frames[index] = points[0:nlabels, 0:3]
+        # 1 if visible, 0 if occluded
+        occluded[index] = (points[4] > -1)[0:nlabels]
+
+
+def generate_blend_curves():
+
+
+        blen_curves = [action.fcurves.new(prop, index=channel, action_group=grpname)
+                       for prop, nbr_channels, grpname in props for channel in range(nbr_channels)]
+
+        for fc, value in zip(blen_curves, chain(loc, rot, sca)):
+            fc.keyframe_points.insert(frame, value, options={'NEEDED', 'FAST'}).interpolation = 'LINEAR'
+
+
 
 
 
