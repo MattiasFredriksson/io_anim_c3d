@@ -42,12 +42,15 @@ if "bpy" in locals():
         importlib.reload(c3d_importer)
     if "c3d_parse_dictionary" in locals():
         importlib.reload(c3d_parse_dictionary)
-    if "c3d" in locals():
-        importlib.reload(c3d)
+    if "pyfuncs" in locals():
+        importlib.reload(pyfuncs)
+    importlib.reload(c3d.__init__)
+
 
 from bpy.props import (
         StringProperty,
         BoolProperty,
+        IntProperty,
         FloatProperty,
         EnumProperty,
         CollectionProperty,
@@ -83,25 +86,44 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
             type=bpy.types.OperatorFileListElement,
             )
 
-    ui_tab: EnumProperty(
-            items=(('MAIN', "Main", "Main basic settings"),
-                   ('ARMATURE', "Armatures", "Armature-related settings"),
-                   ),
-            name="ui_tab",
-            description="Import options categories",
-            )
-
     global_scale: FloatProperty(
             name="Scale",
             min=0.001, max=1000.0,
             default=1.0,
             )
+
+    interpolation: EnumProperty(
+            items=(('LINEAR', "Linear", "Linear interpolation (default)"),
+            ('CUBIC', "Cubic", "Cubic interpolation")),
+            name="Interpolation",
+            default='LINEAR'
+            )
+
+    # It should be noted that the standard states two custom representations:
+    # 0:  'indicates that the 3D point coordinate is the result of modeling
+    #      calculations, interpolation, or filtering'
+    # -1: 'is used to indicate that a point is invalid'
     max_residual: FloatProperty(
         name="Maximum Residual", default=0.0,
-        description="Ignore data samples with a residual greater then specified value.",
-        min=-1., max=1000000.0,
-        soft_min=-1., soft_max=100.0,
+        description="Ignore data samples with a residual greater then specified value. If 0 all samples are included.",
+        min=0., max=1000000.0,
+        soft_min=0., soft_max=100.0,
     )
+
+
+    min_camera_count: IntProperty(
+        name="Minimum camera count",
+        description="Minimum number of cameras recording a marker for it to be considered a valid recording (non-occluded). Not all files record visibility counters.",
+        min=0, max=10,
+        default=0,
+        )
+
+    # This is probably a redundant setting as an invalid point is generally not recorded by a camera
+    occlude_invalid: BoolProperty(
+            name="Occlude Invalid",
+            description="Handle invalid points as occluded",
+            default=True,
+            )
 
     def draw(self, context):
         pass

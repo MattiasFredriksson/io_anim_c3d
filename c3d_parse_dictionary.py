@@ -1,11 +1,5 @@
-
 import numpy as np
 
-
-if "bpy" in locals():
-    import importlib
-    if "c3d" in locals():
-        importlib.reload(c3d)
 
 def filter_names(group):
 	"""

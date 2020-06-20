@@ -1,14 +1,6 @@
-
-import mathutils
-
-if "bpy" in locals():
-    import importlib
-    if "c3d_importer" in locals():
-        importlib.reload(c3d_importer)
-    if "c3d_parse_dictionary" in locals():
-        importlib.reload(c3d_parse_dictionary)
-    if "c3d" in locals():
-        importlib.reload(c3d)
+import mathutils, bpy
+import os
+from . pyfuncs import *
 
 
 def load(operator, context, filepath="",
@@ -16,6 +8,10 @@ def load(operator, context, filepath="",
          axis_forward='-Z',
          axis_up='Y',
          global_scale=1.0,
+         interpolation='LINEAR',
+         occlude_invalid = True,
+         min_camera_count = 0,
+         max_residual=0.0,
          print_file=True):
     import numpy as np
     from bpy_extras.io_utils import axis_conversion
@@ -30,6 +26,7 @@ def load(operator, context, filepath="",
 
 
 
+    file_name = os.path.splitext(os.path.basename(filepath))[0]
 
     parser = C3DParseDictionary(filepath)
 
@@ -45,34 +42,93 @@ def load(operator, context, filepath="",
     first_frame = parser.reader.header.first_frame + 1
     nframes = parser.reader.header.last_frame - first_frame + 1
 
-    frames = np.zeros([nframes, len(labels), 3], dtype=np.float64)
-    occluded = np.zeros([nframes, len(labels)], dtype=np.bool)
-    occluded = np.zeros([nframes, len(labels)], dtype=np.bool)
+    # Create an action
+    action = create_action(file_name)
+    # Generate location (x,y,z) F-Curves for each label
+    blen_curves = generate_blend_curves(action, labels, 3, 'pose.bones["%s"].location')
+    # Format the curve list in sets of 3
+    blen_curves = np.array(blen_curves).reshape(nlabels, 3)
 
-    for i, points, analog in parser.reader.read_frames():
-        print(points.shape)
-        #OpticalTrackerMotion.verify(i, points)
-        index = i - first_frame
-        # Ignore any frames outside parsed timeline
-        if index < 0 and index >= nframes:
-            continue # Not parsed
-        # Extract column: 0,1,2
-        frames[index] = points[0:nlabels, 0:3]
-        # 1 if visible, 0 if occluded
-        occluded[index] = (points[4] > -1)[0:nlabels]
+    for i, points, analog in parser.reader.read_frames(copy=False):
 
+        # Determine valid samples
+        valid = points[:, 4] >= min_camera_count
+        if max_residual > 0.0:
+            valid = np.logical_and(points[:, 3] < max_residual, valid)
 
-def generate_blend_curves():
+        # Insert keyframes by iterating over each valid point and channel (x/y/z)
+        for value, fc in zip(points[valid, :3].flat, blen_curves[valid].flat):
+            fc.keyframe_points.insert(i, value, options={'NEEDED', 'FAST'}).interpolation = interpolation
 
-
-        blen_curves = [action.fcurves.new(prop, index=channel, action_group=grpname)
-                       for prop, nbr_channels, grpname in props for channel in range(nbr_channels)]
-
-        for fc, value in zip(blen_curves, chain(loc, rot, sca)):
-            fc.keyframe_points.insert(frame, value, options={'NEEDED', 'FAST'}).interpolation = 'LINEAR'
+    # Since we inserted our keyframes in 'FAST' mode, we have to update the fcurves now.
+    for fc in blen_curves:
+        fc.update()
 
 
+def create_action(action_name, id_data=None, fake_user=False):
+    # Create new action.
 
+    action = bpy.data.actions.new(action_name)
+    action.use_fake_user = fake_user
+
+    # If none yet assigned, assign this action to id_data.
+    if id_data:
+        if not id_data.animation_data:
+            id_data.animation_data_create()
+        if not id_data.animation_data.action:
+            id_data.animation_data.action = action
+    return action
+
+def generate_blend_curves(action, labels, grp_channel_count, fc_data_path_str):
+    '''
+    Generate F-Curves for the action.
+
+    Parameters
+    ----
+    action:             bpy.types.Action object to generate F-curves for.
+    labels:             String label(s) for generated F-Curves, an action group is generated for each label.
+    grp_channel_count:  Number of channels generated for each label (group).
+    fc_data_path_str:   Unformated data path string used to define the F-Curve data path. If a string format
+                        operator (%s) is contained within the string it will be replaced with the label.
+
+                        Valid args are:
+                        ----
+                        Object anim:
+                        'location', 'scale', 'rotation_quaternion', 'rotation_axis_angle', 'rotation_euler'
+                        Bone anim:
+                        'pose.bones["%s"].location'
+                        'pose.bones["%s"].scale'
+                        'pose.bones["%s"].rotation_quaternion'
+                        'pose.bones["%s"].rotation_axis_angle'
+                        'pose.bones["%s"].rotation_euler'
+
+    '''
+
+    # Convert label to iterable tuple
+    if not islist(labels): labels = (labels)
+
+    # Generate channels for each label to hold location information
+    if '%s' not in fc_data_path_str:
+        # No format operator found in the data_path_str used to define F-curves.
+        blen_curves = [action.fcurves.new(fc_data_path_str, index=i, action_group=label)
+                        for label in labels for i in range(grp_channel_count)]
+    else:
+        # Format operator found, replace it with label associated with the created F-Curve
+        blen_curves = [action.fcurves.new(fc_data_path_str%label, index=i, action_group=label)
+                        for label in labels for i in range(grp_channel_count)]
+    return blen_curves
+
+def something():
+    print(blen_curves)
+
+    #for fc, value in zip(blen_curves, chain(loc, rot, sca)):
+    #    fc.keyframe_points.insert(frame, value, options={'NEEDED', 'FAST'}).interpolation = 'LINEAR'
+
+
+
+    # Since we inserted our keyframes in 'FAST' mode, we have to update the fcurves now.
+    for fc in blen_curves:
+        fc.update()
 
 
 def validate_blend_names(name):
@@ -98,137 +154,28 @@ def blen_read_animations_action_item(action, item, cnodes, fps, anim_offset):
     from bpy.types import Object, PoseBone, ShapeKey, Material, Camera
     from itertools import chain
 
-    fbx_curves = []
-    for curves, fbxprop in cnodes.values():
-        for (fbx_acdata, _blen_data), channel in curves.values():
-            fbx_curves.append((fbxprop, channel, fbx_acdata))
-
-    # Leave if no curves are attached (if a blender curve is attached to scale but without keys it defaults to 0).
-    if len(fbx_curves) == 0:
-        return
 
     blen_curves = []
     props = []
 
-    if isinstance(item, Material):
-        grpname = item.name
-        props = [("diffuse_color", 3, grpname or "Diffuse Color")]
-    elif isinstance(item, ShapeKey):
-        props = [(item.path_from_id("value"), 1, "Key")]
-    elif isinstance(item, Camera):
-        props = [(item.path_from_id("lens"), 1, "Camera")]
-    else:  # Object or PoseBone:
-        if item.is_bone:
-            bl_obj = item.bl_obj.pose.bones[item.bl_bone]
-        else:
-            bl_obj = item.bl_obj
 
-        # We want to create actions for objects, but for bones we 'reuse' armatures' actions!
-        grpname = item.bl_obj.name
 
-        # Since we might get other channels animated in the end, due to all FBX transform magic,
-        # we need to add curves for whole loc/rot/scale in any case.
-        props = [(bl_obj.path_from_id("location"), 3, grpname or "Location"),
-                 None,
-                 (bl_obj.path_from_id("scale"), 3, grpname or "Scale")]
-        rot_mode = bl_obj.rotation_mode
+    for frame, values in blen_read_animations_curves_iter(fbx_curves, anim_offset, 0, fps):
+
+        # Now we have a virtual matrix of transform from AnimCurves, we can insert keyframes!
+        loc, rot, sca = mat.decompose()
         if rot_mode == 'QUATERNION':
-            props[1] = (bl_obj.path_from_id("rotation_quaternion"), 4, grpname or "Quaternion Rotation")
+            if rot_quat_prev.dot(rot) < 0.0:
+                rot = -rot
+            rot_quat_prev = rot
         elif rot_mode == 'AXIS_ANGLE':
-            props[1] = (bl_obj.path_from_id("rotation_axis_angle"), 4, grpname or "Axis Angle Rotation")
+            vec, ang = rot.to_axis_angle()
+            rot = ang, vec.x, vec.y, vec.z
         else:  # Euler
-            props[1] = (bl_obj.path_from_id("rotation_euler"), 3, grpname or "Euler Rotation")
-
-    blen_curves = [action.fcurves.new(prop, index=channel, action_group=grpname)
-                   for prop, nbr_channels, grpname in props for channel in range(nbr_channels)]
-
-    if isinstance(item, Material):
-        for frame, values in blen_read_animations_curves_iter(fbx_curves, anim_offset, 0, fps):
-            value = [0,0,0]
-            for v, (fbxprop, channel, _fbx_acdata) in values:
-                assert(fbxprop == b'DiffuseColor')
-                assert(channel in {0, 1, 2})
-                value[channel] = v
-
-            for fc, v in zip(blen_curves, value):
-                fc.keyframe_points.insert(frame, v, options={'NEEDED', 'FAST'}).interpolation = 'LINEAR'
-
-    elif isinstance(item, ShapeKey):
-        for frame, values in blen_read_animations_curves_iter(fbx_curves, anim_offset, 0, fps):
-            value = 0.0
-            for v, (fbxprop, channel, _fbx_acdata) in values:
-                assert(fbxprop == b'DeformPercent')
-                assert(channel == 0)
-                value = v / 100.0
-
-            for fc, v in zip(blen_curves, (value,)):
-                fc.keyframe_points.insert(frame, v, options={'NEEDED', 'FAST'}).interpolation = 'LINEAR'
-
-    elif isinstance(item, Camera):
-        for frame, values in blen_read_animations_curves_iter(fbx_curves, anim_offset, 0, fps):
-            value = 0.0
-            for v, (fbxprop, channel, _fbx_acdata) in values:
-                assert(fbxprop == b'FocalLength')
-                assert(channel == 0)
-                value = v
-
-            for fc, v in zip(blen_curves, (value,)):
-                fc.keyframe_points.insert(frame, v, options={'NEEDED', 'FAST'}).interpolation = 'LINEAR'
-
-    else:  # Object or PoseBone:
-        if item.is_bone:
-            bl_obj = item.bl_obj.pose.bones[item.bl_bone]
-        else:
-            bl_obj = item.bl_obj
-
-        transform_data = item.fbx_transform_data
-        rot_eul_prev = bl_obj.rotation_euler.copy()
-        rot_quat_prev = bl_obj.rotation_quaternion.copy()
-
-
-        # Pre-compute inverted local rest matrix of the bone, if relevant.
-        restmat_inv = item.get_bind_matrix().inverted_safe() if item.is_bone else None
-
-        for frame, values in blen_read_animations_curves_iter(fbx_curves, anim_offset, 0, fps):
-            for v, (fbxprop, channel, _fbx_acdata) in values:
-                if fbxprop == b'Lcl Translation':
-                    transform_data.loc[channel] = v
-                elif fbxprop == b'Lcl Rotation':
-                    transform_data.rot[channel] = v
-                elif fbxprop == b'Lcl Scaling':
-                    transform_data.sca[channel] = v
-            mat, _, _ = blen_read_object_transform_do(transform_data)
-
-            # compensate for changes in the local matrix during processing
-            if item.anim_compensation_matrix:
-                mat = mat @ item.anim_compensation_matrix
-
-            # apply pre- and post matrix
-            # post-matrix will contain any correction for lights, camera and bone orientation
-            # pre-matrix will contain any correction for a parent's correction matrix or the global matrix
-            if item.pre_matrix:
-                mat = item.pre_matrix @ mat
-            if item.post_matrix:
-                mat = mat @ item.post_matrix
-
-            # And now, remove that rest pose matrix from current mat (also in parent space).
-            if restmat_inv:
-                mat = restmat_inv @ mat
-
-            # Now we have a virtual matrix of transform from AnimCurves, we can insert keyframes!
-            loc, rot, sca = mat.decompose()
-            if rot_mode == 'QUATERNION':
-                if rot_quat_prev.dot(rot) < 0.0:
-                    rot = -rot
-                rot_quat_prev = rot
-            elif rot_mode == 'AXIS_ANGLE':
-                vec, ang = rot.to_axis_angle()
-                rot = ang, vec.x, vec.y, vec.z
-            else:  # Euler
-                rot = rot.to_euler(rot_mode, rot_eul_prev)
-                rot_eul_prev = rot
-            for fc, value in zip(blen_curves, chain(loc, rot, sca)):
-                fc.keyframe_points.insert(frame, value, options={'NEEDED', 'FAST'}).interpolation = 'LINEAR'
+            rot = rot.to_euler(rot_mode, rot_eul_prev)
+            rot_eul_prev = rot
+        for fc, value in zip(blen_curves, chain(loc, rot, sca)):
+            fc.keyframe_points.insert(frame, value, options={'NEEDED', 'FAST'}).interpolation = 'LINEAR'
 
     # Since we inserted our keyframes in 'FAST' mode, we have to update the fcurves now.
     for fc in blen_curves:

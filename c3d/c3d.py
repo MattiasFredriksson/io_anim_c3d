@@ -13,10 +13,10 @@ PROCESSOR_INTEL = 84
 PROCESSOR_DEC = 85
 PROCESSOR_MIPS = 86
 
-def CONVERT_FLOAT(uint_32):
-    '''Unpacks 32 bit unsigned int to a IEEE float representation
+def UNPACK_FLOAT_IEEE(uint_32):
+    '''Unpacks a single 32 bit unsigned int to a IEEE float representation
     '''
-    return struct.unpack('f', struct.pack("<I", int_32))[0]
+    return struct.unpack('f', struct.pack("<I", uint_32))[0]
 def DEC_to_IEEE(uint_32):
     '''Convert the 32 bit representation of a DEC float to IEEE format.
 
@@ -234,8 +234,8 @@ long_event_labels: {0.long_event_labels}
             self.scale_factor = DEC_to_IEEE(self.scale_factor)
             self.frame_rate = DEC_to_IEEE(self.frame_rate)
         elif proc == PROCESSOR_INTEL:
-            self.scale_factor = CONVERT_FLOAT(self.scale_factor)
-            self.frame_rate = CONVERT_FLOAT(self.frame_rate)
+            self.scale_factor = UNPACK_FLOAT_IEEE(self.scale_factor)
+            self.frame_rate = UNPACK_FLOAT_IEEE(self.frame_rate)
 
 
 class Param(object):
@@ -943,7 +943,7 @@ class Reader(Manager):
         scale_mag = abs(self.point_scale)
         is_float = self.point_scale < 0
 
-        point_bytes = [2, 4][is_float]
+        point_word_bytes = [2, 4][is_float]
         point_dtype = [np.int16, np.uint32][is_float]
         points = np.zeros((self.point_used, 5), float)
 
@@ -975,21 +975,34 @@ class Reader(Manager):
         if param is not None:
             gen_scale = param.float_value
 
+        # Seek to the start point of the data blocks
         self._handle.seek((self.header.data_block - 1) * 512)
+        # Parse the data blocks
         for frame_no in range(self.first_frame(), self.last_frame() + 1):
-            n = 4 * self.header.point_count
-            raw_bytes = self._handle.read(n * point_bytes)
-            raw = np.fromstring(raw_bytes,
+            n_word = 4 * self.point_used
+            n_tot_word = 4 * self.header.point_count
+
+            # Read the byte data (used) for the block
+            raw_bytes = self._handle.read(n_word * point_word_bytes)
+
+            # Convert the bytes to a unsigned 32 bit or signed 16 bit representation
+            raw = np.frombuffer(raw_bytes,
                                 dtype=point_dtype,
-                                count=n).reshape((self.point_used, 4))
+                                count=n_word).reshape((self.point_used, 4))
 
             if is_float:
-                # Read point 4 byte words in float-32 format
+                # Convert every 4 byte words to a float-32 reprensentation
+                # (the fourth column is still not a float32 representation)
                 if self.processor == PROCESSOR_DEC:
-                    # Convert each word to IEEE float
-                    points[:,:4] = DEC_to_IEEE(raw)[:]
+                    # Convert each of the first 6 16-bit words from DEC to IEEE float
+                    points[:,:3] = DEC_to_IEEE(raw[:self.point_used,:3])
                 elif self.processor == PROCESSOR_INTEL:
-                    points[:,:4] = np.fromstring(raw_bytes, dtype=np.float32, count=n).reshape((self.point_used, 4))[:,:4]
+                    # Re-read the raw byte representation directly rather then convert the
+                    # 3 first columns in the uint32 representation.
+                    points[:,:3] = np.frombuffer(raw_bytes,
+                                                 dtype=np.float32,
+                                                 count=n_word).reshape((self.point_used, 4))[:self.point_used,:3]
+
 
                 # Parse the camera-observed bits and residual.
                 # However, there seem to be different ways this process is interpreted,
@@ -1004,21 +1017,20 @@ class Reader(Manager):
                 # - The same format should be used internally when a float or integer representation is used,
                 #   with the difference that the words are 16 and 8 bit respectively (see the MLS guide).
                 # - Invalidation appear to either set the int32 sign-bit (creating a negative value but not -1 specifically) or
-                # a floating point value of -1 (method #2), where the sign is defined in the most signficant bit of the last 2 bytes.
-                # Therefor, both sign bits are cheked introducing a issue when residual is large (i.e. greater then 01111111).
-                # This issue could plausibly be checked by verifying 0 coordinate vectors, and/or i might have missed/missunderstood something.
+                #   a floating point value of -1 (method #2), where the sign is defined in the most signficant bit of the last 2 bytes.
+                #   Therefor, both sign bits are cheked introducing a issue when residual is large (i.e. greater then 01111111).
+                #   This issue could plausibly be checked by verifying 0 coordinate vectors, and/or i might have missed/missunderstood something.
                 valid = (raw[:,3] & 0x80008000) == 0
-                c = raw[:,3].astype(np.int32)
+                c = raw[valid,3]
 
-                c = c[valid]
-                points[~valid, 3:5] = -1
+                points[~valid, 3:5] = -1.0
 
                 # Mask the 2 low bytes as residual bits (righmost bits)
                 points[valid, 3] = (c & 0x0000ffff).astype(float) * scale_mag
                 # Sum high bits as camera-observation count
                 points[valid, 4] = sum((c & (1 << k)) >> k for k in range(16, 32))
 
-            else:
+            else: # 16 bit int representation
                 # Read point 2 byte words in int-16 format
                 points[:, :3] = raw[:, :3] * scale_mag
 
