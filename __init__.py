@@ -38,12 +38,15 @@ import bpy
 
 if "bpy" in locals():
     import importlib
-    if "c3d_importer" in locals():
-        importlib.reload(c3d_importer)
-    if "c3d_parse_dictionary" in locals():
-        importlib.reload(c3d_parse_dictionary)
+    # Ensure dependency order is correct
     if "pyfuncs" in locals():
         importlib.reload(pyfuncs)
+    if "perfmon" in locals():
+        importlib.reload(perfmon)
+    if "c3d_parse_dictionary" in locals():
+        importlib.reload(c3d_parse_dictionary)
+    if "c3d_importer" in locals():
+        importlib.reload(c3d_importer)
     importlib.reload(c3d.__init__)
 
 
@@ -92,9 +95,25 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
             default=1.0,
             )
 
+    # Interpolation settings (link below), there is such thing as to many settings so ignored ones
+    # seemingly redundant.
+    # https://docs.blender.org/api/current/bpy.types.Keyframe.html#bpy.types.Keyframe.interpolation
     interpolation: EnumProperty(
-            items=(('LINEAR', "Linear", "Linear interpolation (default)"),
-            ('CUBIC', "Cubic", "Cubic interpolation")),
+            items=(
+            ('CONSTANT', "Constant", "Constant, No interpolation."),
+            ('LINEAR', "Linear", "Linear interpolation."),
+            ('BEZIER', "Bezier", "Smooth interpolation between A and B, with some control over curve shape."),
+            #('SINE', "Sinusoidal", "Sinusoidal easing (weakest, almost linear but with a slight curvature)."),
+            ('QUAD', "Quadratic", "Quadratic easing."),
+            ('CUBIC', "Cubic", "Cubic easing."),
+            #('QUART', "Quartic", "Quartic easing."),
+            #('QUINT', "Quintic", "Quintic easing."),
+            ('CIRC', "Circular", "Circular easing (strongest and most dynamic)."),
+            #('BOUNCE', "Bounce", "Exponentially decaying parabolic bounce, like when objects collide."),
+            # Options with specific settings
+            #('BACK', "Back", "Cubic easing with overshoot and settle."),
+            #('ELASTIC', "Elastic", "Exponentially decaying sine wave, like an elastic band."),
+            ),
             name="Interpolation",
             default='LINEAR'
             )

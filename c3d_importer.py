@@ -12,10 +12,19 @@ def load(operator, context, filepath="",
          occlude_invalid = True,
          min_camera_count = 0,
          max_residual=0.0,
-         print_file=True):
+         print_file=False):
     import numpy as np
     from bpy_extras.io_utils import axis_conversion
     from .c3d_parse_dictionary import C3DParseDictionary
+    from . perfmon import PerfMon
+
+    # Action id
+    file_id = os.path.basename(filepath)
+    file_name = os.path.splitext(file_id)[0]
+
+    # Monitor performance
+    perfmon = PerfMon()
+    perfmon.level_up('Importing: %s ...' % file_id, True)
 
     # World orientation adjustment
     if use_manual_orientation:
@@ -25,8 +34,6 @@ def load(operator, context, filepath="",
     global_orientation = global_orientation @ mathutils.Matrix.Scale(global_scale, 4)
 
 
-
-    file_name = os.path.splitext(os.path.basename(filepath))[0]
 
     parser = C3DParseDictionary(filepath)
 
@@ -45,9 +52,17 @@ def load(operator, context, filepath="",
     # Create an action
     action = create_action(file_name)
     # Generate location (x,y,z) F-Curves for each label
-    blen_curves = generate_blend_curves(action, labels, 3, 'pose.bones["%s"].location')
+    blen_curves_arr = generate_blend_curves(action, labels, 3, 'pose.bones["%s"].location')
     # Format the curve list in sets of 3
-    blen_curves = np.array(blen_curves).reshape(nlabels, 3)
+    blen_curves = np.array(blen_curves_arr).reshape(nlabels, 3)
+
+
+    perfmon.level_up('Processing POINT data..', True)
+
+    read_sampler, key_sampler = new_sampler(True), new_sampler()
+
+    for fc in blen_curves_arr:
+        fc.keyframe_points.add(nframes)
 
     for i, points, analog in parser.reader.read_frames(copy=False):
 
@@ -56,13 +71,38 @@ def load(operator, context, filepath="",
         if max_residual > 0.0:
             valid = np.logical_and(points[:, 3] < max_residual, valid)
 
+        end_sample(read_sampler)
+        begin_sample(key_sampler)
+
+        index = i - first_frame
+
         # Insert keyframes by iterating over each valid point and channel (x/y/z)
+        #for value, fc in zip(points[valid, :3].flat, blen_curves[valid].flat):
         for value, fc in zip(points[valid, :3].flat, blen_curves[valid].flat):
-            fc.keyframe_points.insert(i, value, options={'NEEDED', 'FAST'}).interpolation = interpolation
+            kf = fc.keyframe_points[index]
+            kf.co = (i, value)
+            kf.interpolation = interpolation
+            #kf.type = 'KEFRAME' # Default
+
+            # Inserting keyframes is veeerry slooooww:
+            #fc.keyframe_points.insert(i, value, options={'FAST'}).interpolation = interpolation
+
+        end_sample(key_sampler)
+        begin_sample(read_sampler)
+
+    end_sample(read_sampler)
+    perfmon.level_down()
 
     # Since we inserted our keyframes in 'FAST' mode, we have to update the fcurves now.
-    for fc in blen_curves:
+    for fc in blen_curves_arr:
         fc.update()
+
+    perfmon.level_down()
+
+    rtot, rmean = analyze_sample(read_sampler, 0, -1)
+    ktot, kmean = analyze_sample(key_sampler)
+    perfmon.message('File read (tot, mean):  %0.00f \t %f (s)' % (rtot, rmean))
+    perfmon.message('Key insert (tot, mean): %0.00f \t %f (s)' % (ktot, kmean))
 
 
 def create_action(action_name, id_data=None, fake_user=False):
@@ -118,19 +158,6 @@ def generate_blend_curves(action, labels, grp_channel_count, fc_data_path_str):
                         for label in labels for i in range(grp_channel_count)]
     return blen_curves
 
-def something():
-    print(blen_curves)
-
-    #for fc, value in zip(blen_curves, chain(loc, rot, sca)):
-    #    fc.keyframe_points.insert(frame, value, options={'NEEDED', 'FAST'}).interpolation = 'LINEAR'
-
-
-
-    # Since we inserted our keyframes in 'FAST' mode, we have to update the fcurves now.
-    for fc in blen_curves:
-        fc.update()
-
-
 def validate_blend_names(name):
     assert(type(name) == bytes)
     # Blender typically does not accept names over 63 bytes...
@@ -146,37 +173,3 @@ def validate_blend_names(name):
     else:
         # We use 'replace' even though FBX 'specs' say it should always be utf8, see T53841.
         return name.decode('utf-8', 'replace')
-def blen_read_animations_action_item(action, item, cnodes, fps, anim_offset):
-    """
-    'Bake' loc/rot/scale into the action,
-    taking any pre_ and post_ matrix into account to transform from fbx into blender space.
-    """
-    from bpy.types import Object, PoseBone, ShapeKey, Material, Camera
-    from itertools import chain
-
-
-    blen_curves = []
-    props = []
-
-
-
-    for frame, values in blen_read_animations_curves_iter(fbx_curves, anim_offset, 0, fps):
-
-        # Now we have a virtual matrix of transform from AnimCurves, we can insert keyframes!
-        loc, rot, sca = mat.decompose()
-        if rot_mode == 'QUATERNION':
-            if rot_quat_prev.dot(rot) < 0.0:
-                rot = -rot
-            rot_quat_prev = rot
-        elif rot_mode == 'AXIS_ANGLE':
-            vec, ang = rot.to_axis_angle()
-            rot = ang, vec.x, vec.y, vec.z
-        else:  # Euler
-            rot = rot.to_euler(rot_mode, rot_eul_prev)
-            rot_eul_prev = rot
-        for fc, value in zip(blen_curves, chain(loc, rot, sca)):
-            fc.keyframe_points.insert(frame, value, options={'NEEDED', 'FAST'}).interpolation = 'LINEAR'
-
-    # Since we inserted our keyframes in 'FAST' mode, we have to update the fcurves now.
-    for fc in blen_curves:
-        fc.update()
