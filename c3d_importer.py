@@ -8,6 +8,7 @@ def load(operator, context, filepath="",
          axis_forward='-Z',
          axis_up='Y',
          global_scale=1.0,
+         create_armature=True,
          interpolation='LINEAR',
          occlude_invalid = True,
          min_camera_count = 0,
@@ -49,8 +50,15 @@ def load(operator, context, filepath="",
     first_frame = parser.reader.header.first_frame + 1
     nframes = parser.reader.header.last_frame - first_frame + 1
 
+    # Create an armature adapted to the data (if specified)
+    arm_obj = None
+    if create_armature:
+        arm_obj = create_armature_object(context, file_name)
+        add_empty_armature_bones(context, arm_obj, labels, 0.1)
+
+
     # Create an action
-    action = create_action(file_name)
+    action = create_action(file_name, arm_obj)
     # Generate location (x,y,z) F-Curves for each label
     blen_curves_arr = generate_blend_curves(action, labels, 3, 'pose.bones["%s"].location')
     # Format the curve list in sets of 3
@@ -97,27 +105,73 @@ def load(operator, context, filepath="",
     for fc in blen_curves_arr:
         fc.update()
 
-    perfmon.level_down()
+    perfmon.level_down("Import finished.")
 
     rtot, rmean = analyze_sample(read_sampler, 0, -1)
     ktot, kmean = analyze_sample(key_sampler)
-    perfmon.message('File read (tot, mean):  %0.00f \t %f (s)' % (rtot, rmean))
-    perfmon.message('Key insert (tot, mean): %0.00f \t %f (s)' % (ktot, kmean))
+    perfmon.message('File read (tot, mean):  %0.3f \t %f (s)' % (rtot, rmean))
+    perfmon.message('Key insert (tot, mean): %0.3f \t %f (s)' % (ktot, kmean))
+
+    bpy.context.view_layer.update()
+    return {'FINISHED'}
 
 
-def create_action(action_name, id_data=None, fake_user=False):
+def create_action(action_name, object=None, fake_user=False):
     # Create new action.
 
     action = bpy.data.actions.new(action_name)
     action.use_fake_user = fake_user
 
     # If none yet assigned, assign this action to id_data.
-    if id_data:
-        if not id_data.animation_data:
-            id_data.animation_data_create()
-        if not id_data.animation_data.action:
-            id_data.animation_data.action = action
+    if object:
+        if not object.animation_data:
+            object.animation_data_create()
+        if not object.animation_data.action:
+            object.animation_data.action = action
     return action
+
+def create_armature_object(context, name):
+    arm_data = bpy.data.armatures.new(name=name)
+    arm_obj = bpy.data.objects.new(name=name, object_data=arm_data)
+
+    # Instance in scene.
+    context.view_layer.active_layer_collection.collection.objects.link(arm_obj)
+
+    return arm_obj
+
+def add_empty_armature_bones(context, arm_obj, bone_names, length=0.1):
+    '''
+    Generate a set of named bones
+
+    Params:
+    ----
+    context:    bpy.context
+    arm_obj:    Armature object
+    length:     Length of each bone.
+    '''
+
+    assert arm_obj.type == 'ARMATURE', "Object passed to 'add_empty_armature_bones()' must be an armature."
+
+    # Clear any selection
+    bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+    bpy.ops.object.select_all(action='DESELECT')
+    # Enter edit mode for the armature
+    bpy.context.view_layer.objects.active = arm_obj
+    arm_obj.select_set(True)
+    bpy.ops.object.mode_set(mode='EDIT', toggle=False)
+
+    edit_bones = arm_obj.data.edit_bones
+
+    if not islist(bone_names):
+        bone_names = [bone_names]
+
+    for name in bone_names:
+        # Create a new bone
+        b = edit_bones.new(name)
+        b.head = (0.0, 0.0, 0.0)
+        b.tail = (0.0, 0.0, length)
+
+    bpy.ops.object.mode_set(mode='OBJECT')
 
 def generate_blend_curves(action, labels, grp_channel_count, fc_data_path_str):
     '''

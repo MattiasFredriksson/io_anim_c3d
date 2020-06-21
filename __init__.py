@@ -95,6 +95,13 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
             default=1.0,
             )
 
+
+    create_armature: BoolProperty(
+            name="Create Armature",
+            description="Generate an armature for the data.",
+            default=True,
+            )
+
     # Interpolation settings (link below), there is such thing as to many settings so ignored ones
     # seemingly redundant.
     # https://docs.blender.org/api/current/bpy.types.Keyframe.html#bpy.types.Keyframe.interpolation
