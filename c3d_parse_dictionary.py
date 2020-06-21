@@ -73,6 +73,8 @@ class C3DParseDictionary:
         if filePath == None:                self.reader = None
         else:                               self.readFile(filePath)
     # end init()
+    def __del__(self):
+        self.close()
     def readFile(self, file_path):
         # Open file handle
         self.file_handle = open(file_path, 'rb')
@@ -82,6 +84,8 @@ class C3DParseDictionary:
         # Localize some params:
         self.groups = list(filter_names(self.reader.groups))
     # end readFile()
+    def close(self):
+        self.file_handle.close()
     def getGroup(self, group_id):
         """
         Get a group from a group name id

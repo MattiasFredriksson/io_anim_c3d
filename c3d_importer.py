@@ -1,5 +1,6 @@
 import mathutils, bpy
 import os
+import numpy as np
 from . pyfuncs import *
 
 
@@ -14,8 +15,8 @@ def load(operator, context, filepath="",
          occlude_invalid = True,
          min_camera_count = 0,
          max_residual=0.0,
+         load_mem_efficient=False,
          print_file=False):
-    import numpy as np
     from bpy_extras.io_utils import axis_conversion
     from .c3d_parse_dictionary import C3DParseDictionary
     from . perfmon import PerfMon
@@ -30,12 +31,12 @@ def load(operator, context, filepath="",
 
     # World orientation adjustment
     if use_manual_orientation:
-        global_orientation = axis_conversion(from_forward=axis_forward, from_up=axis_up).to_4x4()
+        global_orient = axis_conversion(from_forward=axis_forward, from_up=axis_up)
     else:
-        global_orientation = mathutils.Matrix.Identity(4)
-    global_orientation = global_orientation @ mathutils.Matrix.Scale(global_scale, 4)
-
-
+        global_orient = mathutils.Matrix.Identity(3)
+    global_orient = global_orient @ mathutils.Matrix.Scale(global_scale, 3)
+    # Convert to a numpy array matrix
+    global_orient = np.array(global_orient)
 
     parser = C3DParseDictionary(filepath)
 
@@ -48,7 +49,7 @@ def load(operator, context, filepath="",
     # Number of frames [first, last] => +1
     # first_frame is the frame index to start parsing from
     # nframes is the number of frames to parse
-    first_frame = parser.reader.header.first_frame + 1
+    first_frame = parser.reader.header.first_frame
     nframes = parser.reader.header.last_frame - first_frame + 1
 
     # Create an armature adapted to the data (if specified)
@@ -65,42 +66,16 @@ def load(operator, context, filepath="",
     # Format the curve list in sets of 3
     blen_curves = np.array(blen_curves_arr).reshape(nlabels, 3)
 
-
-    perfmon.level_up('Processing POINT data..', True)
-
-    read_sampler, key_sampler = new_sampler(True), new_sampler()
-
-    for fc in blen_curves_arr:
-        fc.keyframe_points.add(nframes)
-
-    for i, points, analog in parser.reader.read_frames(copy=False):
-
-        # Determine valid samples
-        valid = points[:, 4] >= min_camera_count
-        if max_residual > 0.0:
-            valid = np.logical_and(points[:, 3] < max_residual, valid)
-
-        end_sample(read_sampler)
-        begin_sample(key_sampler)
-
-        index = i - first_frame
-
-        # Insert keyframes by iterating over each valid point and channel (x/y/z)
-        #for value, fc in zip(points[valid, :3].flat, blen_curves[valid].flat):
-        for value, fc in zip(points[valid, :3].flat, blen_curves[valid].flat):
-            kf = fc.keyframe_points[index]
-            kf.co = (i, value)
-            kf.interpolation = interpolation
-            #kf.type = 'KEFRAME' # Default
-
-            # Inserting keyframes is veeerry slooooww:
-            #fc.keyframe_points.insert(i, value, options={'FAST'}).interpolation = interpolation
-
-        end_sample(key_sampler)
-        begin_sample(read_sampler)
-
-    end_sample(read_sampler)
-    perfmon.level_down()
+    if load_mem_efficient:
+        # Primarily a test function.
+        read_data_mem_efficient(parser, blen_curves, labels, first_frame, nframes,
+                                interpolation, min_camera_count, max_residual,
+                                perfmon)
+    else:
+        # Default processing func.
+        read_data_processor_efficient(parser, blen_curves, labels, first_frame, nframes,
+                                      interpolation, min_camera_count, max_residual,
+                                      perfmon)
 
     # Since we inserted our keyframes in 'FAST' mode, we have to update the fcurves now.
     for fc in blen_curves_arr:
@@ -108,14 +83,114 @@ def load(operator, context, filepath="",
 
     perfmon.level_down("Import finished.")
 
+    bpy.context.view_layer.update()
+    return {'FINISHED'}
+
+
+def read_data_processor_efficient(parser, blen_curves, labels, first_frame, nframes,
+                                  interpolation,
+                                  min_camera_count, max_residual,
+                                  perfmon):
+    '''Read and keyframe POINT data.
+    '''
+    nlabels = len(labels)
+
+    point_frames = np.zeros([nframes, nlabels, 3], dtype=np.float64)
+    valid = np.empty([nframes, nlabels], dtype=np.bool)
+
+    # Start reading POINT blocks (and analog, but signals from force plates etc. are not supported...)
+    perfmon.level_up('Reading POINT data..', True)
+    for i, points, analog in parser.reader.read_frames(copy=False):
+        index = i - first_frame
+
+        # Determine valid samples
+        valid[index] = valid_points(points, min_camera_count, max_residual)
+
+        # Extract columns 0:3
+        point_frames[index] = points[0:nlabels,0:3]
+
+    perfmon.level_down('Reading Done.')
+
+    # Time to generate keyframes
+    perfmon.level_up('Keyframing POINT data..', True)
+    # Number of valid keys for each label
+    nkeys = np.sum(valid, axis=0)
+    frame_range = np.arange(0, nframes)
+    # Iterate each group (tracker label)
+    for group_ind, fc_set in enumerate(blen_curves):
+        # Create keyframes
+        for fc in fc_set:
+            fc.keyframe_points.add(nkeys[group_ind])
+
+        # Iterate valid frames and insert keyframes
+        indices = frame_range[valid[:, group_ind]]
+        for key_ind, (frame, p) in enumerate(zip(indices, point_frames[indices])):
+            for dim, fc in enumerate(fc_set):
+                kf = fc.keyframe_points[key_ind]
+                kf.co = (frame, p[dim])
+                kf.interpolation = interpolation
+
+    perfmon.level_down('Keyframing Done.')
+
+def valid_points(point_block, min_camera_count, max_residual):
+    ''' Determine valid points in a block.
+    '''
+    valid = point_block[:, 4] >= min_camera_count
+    if max_residual > 0.0:
+        valid = np.logical_and(point_block[:, 3] < max_residual, valid)
+    return valid
+
+def read_data_mem_efficient(parser, blen_curves, labels,
+                            first_frame, nframes,
+                            interpolation,
+                            min_camera_count, max_residual,
+                            perfmon):
+    '''Read POINT data block by block, inserting keyframes for a .c3d block at a time.
+
+    Note:
+    This function reads a .c3d block (frame) at a time, and uses insert(keyframe).
+    Inserting is very slow, but this might change in which case this an acceptable
+    solution. Now it serves two purposes:
+    1. Test and/or example case for how the code could be written.
+    2. Provide memory efficient loading, currently it's useless due to the processing time but that might change.
+    '''
+
+    perfmon.level_up('Processing POINT data..', True)
+
+
+    read_sampler, key_sampler = new_sampler(True), new_sampler()
+
+    for i, points, analog in parser.reader.read_frames(copy=False):
+
+        # Determine valid samples
+        valid = valid_points(points, min_camera_count, max_residual)
+
+        end_sample(read_sampler)
+        begin_sample(key_sampler)
+
+        index = i - first_frame
+
+        # Insert keyframes by iterating over each valid point and channel (x/y/z)
+        for value, fc in zip(points[valid, :3].flat, blen_curves[valid].flat):
+            # Inserting keyframes is veeerry slooooww:
+            fc.keyframe_points.insert(i, value, options={'FAST'}).interpolation = interpolation
+
+            # Fast insert that are added first, generates empty keyframes complicated to get rid of,
+            # hence the number of keyframes must be known when using this method.
+            #kf = fc.keyframe_points[index]
+            #kf.co = (i, value)
+            #kf.interpolation = interpolation
+
+        end_sample(key_sampler)
+        begin_sample(read_sampler)
+
+    end_sample(read_sampler)
+
+    perfmon.level_down()
     rtot, rmean = analyze_sample(read_sampler, 0, -1)
     ktot, kmean = analyze_sample(key_sampler)
     perfmon.message('File read (tot, mean):  %0.3f \t %f (s)' % (rtot, rmean))
     perfmon.message('Key insert (tot, mean): %0.3f \t %f (s)' % (ktot, kmean))
-
-    bpy.context.view_layer.update()
-    return {'FINISHED'}
-
 
 def create_action(action_name, object=None, fake_user=False):
     # Create new action.
@@ -153,12 +228,16 @@ def add_empty_armature_bones(context, arm_obj, bone_names, length=0.1):
 
     assert arm_obj.type == 'ARMATURE', "Object passed to 'add_empty_armature_bones()' must be an armature."
 
+    # Try to enter object mode, polling active object is unreliable since an object can be in edit mode but not active!
+    try:
+        bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+    except:
+        pass
     # Clear any selection
-    bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
     bpy.ops.object.select_all(action='DESELECT')
     # Enter edit mode for the armature
-    bpy.context.view_layer.objects.active = arm_obj
     arm_obj.select_set(True)
+    bpy.context.view_layer.objects.active = arm_obj
     bpy.ops.object.mode_set(mode='EDIT', toggle=False)
 
     edit_bones = arm_obj.data.edit_bones
