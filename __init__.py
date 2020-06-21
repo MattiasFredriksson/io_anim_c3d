@@ -102,6 +102,12 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
             default=True,
             )
 
+    fake_user: BoolProperty(
+            name="Set Fake User",
+            description="If the fake user flag for generated actions should be set.",
+            default=True,
+            )
+
     # Interpolation settings (link below), there is such thing as to many settings so ignored ones
     # seemingly redundant.
     # https://docs.blender.org/api/current/bpy.types.Keyframe.html#bpy.types.Keyframe.interpolation

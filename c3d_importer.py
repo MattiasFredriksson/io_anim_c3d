@@ -9,6 +9,7 @@ def load(operator, context, filepath="",
          axis_up='Y',
          global_scale=1.0,
          create_armature=True,
+         fake_user=True,
          interpolation='LINEAR',
          occlude_invalid = True,
          min_camera_count = 0,
@@ -58,7 +59,7 @@ def load(operator, context, filepath="",
 
 
     # Create an action
-    action = create_action(file_name, arm_obj)
+    action = create_action(file_name, arm_obj, fake_user)
     # Generate location (x,y,z) F-Curves for each label
     blen_curves_arr = generate_blend_curves(action, labels, 3, 'pose.bones["%s"].location')
     # Format the curve list in sets of 3
@@ -211,19 +212,3 @@ def generate_blend_curves(action, labels, grp_channel_count, fc_data_path_str):
         blen_curves = [action.fcurves.new(fc_data_path_str%label, index=i, action_group=label)
                         for label in labels for i in range(grp_channel_count)]
     return blen_curves
-
-def validate_blend_names(name):
-    assert(type(name) == bytes)
-    # Blender typically does not accept names over 63 bytes...
-    if len(name) > 63:
-        import hashlib
-        h = hashlib.sha1(name).hexdigest()
-        n = 55
-        name_utf8 = name[:n].decode('utf-8', 'replace') + "_" + h[:7]
-        while len(name_utf8.encode()) > 63:
-            n -= 1
-            name_utf8 = name[:n].decode('utf-8', 'replace') + "_" + h[:7]
-        return name_utf8
-    else:
-        # We use 'replace' even though FBX 'specs' say it should always be utf8, see T53841.
-        return name.decode('utf-8', 'replace')
