@@ -22,7 +22,6 @@ def load(operator, context, filepath="",
     from .c3d_parse_dictionary import C3DParseDictionary
     from . perfmon import PerfMon
 
-    print(axis_forward, axis_up)
     # Action id
     file_id = os.path.basename(filepath)
     file_name = os.path.splitext(file_id)[0]
@@ -155,8 +154,7 @@ def read_data_processor_efficient(parser, blen_curves, labels, global_orient, fi
 
     perfmon.level_down('Keyframing Done.')
 
-def read_data_mem_efficient(parser, blen_curves, labels,
-                            global_orient, first_frame, nframes,
+def read_data_mem_efficient(parser, blen_curves, labels, global_orient, first_frame, nframes,
                             interpolation,
                             min_camera_count, max_residual,
                             perfmon):

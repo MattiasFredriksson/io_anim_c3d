@@ -158,11 +158,23 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
 
 
     min_camera_count: IntProperty(
-        name="Minimum camera count",
+        name="Min. camera count",
         description="Minimum number of cameras recording a marker for it to be considered a valid recording (non-occluded). Not all files record visibility counters",
         min=0, max=10,
         default=0,
         )
+
+    print_file: BoolProperty(
+            name="Print File",
+            description="Print file and parameter headers to console",
+            default=False,
+            )
+
+    load_mem_efficient: BoolProperty(
+            name="Memory Efficient",
+            description="Use memory efficient method rather at huge processing cost",
+            default=False,
+            )
 
     def draw(self, context):
         pass
@@ -305,6 +317,34 @@ class C3D_PT_import_transform_manual_orientation(bpy.types.Panel):
         layout.prop(operator, "axis_forward")
         layout.prop(operator, "axis_up")
 
+class C3D_PT_debug(bpy.types.Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+    bl_label = "Console"
+    bl_parent_id = "FILE_PT_operator"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        return operator.bl_idname == "IMPORT_ANIM_OT_c3d"
+
+    def draw_header(self, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False  # No animation.
+
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        layout.prop(operator, "print_file")
+        layout.prop(operator, "load_mem_efficient")
 
 #######################
 # Register Menu Items
@@ -327,6 +367,7 @@ classes = (
     C3D_PT_marker_armature,
     C3D_PT_import_transform,
     C3D_PT_import_transform_manual_orientation,
+    C3D_PT_debug,
     #ExportC3D,
 )
 
