@@ -10,6 +10,7 @@ def load(operator, context, filepath="",
          axis_up='Y',
          global_scale=1.0,
          create_armature=True,
+         bone_size=0.02,
          fake_user=True,
          interpolation='LINEAR',
          occlude_invalid = True,
@@ -61,9 +62,14 @@ def load(operator, context, filepath="",
 
     # Create an armature adapted to the data (if specified)
     arm_obj = None
+    bone_radius = bone_size * 0.2
     if create_armature:
-        arm_obj = create_armature_object(context, file_name)
-        add_empty_armature_bones(context, arm_obj, labels, 0.1)
+        arm_obj = create_armature_object(context, file_name, 'BBONE')
+        add_empty_armature_bones(context, arm_obj, labels, bone_size)
+        # Set the width of the bbones
+        for bone in arm_obj.data.bones:
+            bone.bbone_x = bone_radius
+            bone.bbone_z = bone_radius
 
 
     # Create an action
@@ -218,12 +224,15 @@ def create_action(action_name, object=None, fake_user=False):
             object.animation_data.action = action
     return action
 
-def create_armature_object(context, name):
+def create_armature_object(context, name, display_type='OCTAHEDRAL'):
     arm_data = bpy.data.armatures.new(name=name)
+    arm_data.display_type = display_type
+
     arm_obj = bpy.data.objects.new(name=name, object_data=arm_data)
 
     # Instance in scene.
     context.view_layer.active_layer_collection.collection.objects.link(arm_obj)
+
 
     return arm_obj
 

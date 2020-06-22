@@ -102,6 +102,14 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
             default=True,
             )
 
+    bone_size: FloatProperty(
+        name="Marker Size", default=0.02,
+        description="Define the width of each marker.",
+        min=0.001, max=10.0,
+        soft_min=0.01, soft_max=1.0,
+    )
+
+
     fake_user: BoolProperty(
             name="Set Fake User",
             description="If the fake user flag for generated actions should be set.",
