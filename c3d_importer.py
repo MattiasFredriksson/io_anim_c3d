@@ -16,11 +16,12 @@ def load(operator, context, filepath="",
          min_camera_count = 0,
          max_residual=0.0,
          load_mem_efficient=False,
-         print_file=False):
+         print_file=True):
     from bpy_extras.io_utils import axis_conversion
     from .c3d_parse_dictionary import C3DParseDictionary
     from . perfmon import PerfMon
 
+    print(axis_forward, axis_up)
     # Action id
     file_id = os.path.basename(filepath)
     file_name = os.path.splitext(file_id)[0]
@@ -29,16 +30,22 @@ def load(operator, context, filepath="",
     perfmon = PerfMon()
     perfmon.level_up('Importing: %s ...' % file_id, True)
 
+    # Open file and read parameter headers
+    parser = C3DParseDictionary(filepath)
+
+    unit_conv_fac = unit_conversion(parser, 'POINT', sys_unit='m')
+
     # World orientation adjustment
+    scale = global_scale*unit_conv_fac
     if use_manual_orientation:
         global_orient = axis_conversion(from_forward=axis_forward, from_up=axis_up)
+        global_orient = global_orient @ mathutils.Matrix.Scale(scale, 3)
+        # Convert to a numpy array matrix
+        global_orient = np.array(global_orient)
     else:
-        global_orient = mathutils.Matrix.Identity(3)
-    global_orient = global_orient @ mathutils.Matrix.Scale(global_scale, 3)
-    # Convert to a numpy array matrix
-    global_orient = np.array(global_orient)
+        global_orient = parser.axis_interpretation([0,0,1], [0,1,0])
+        global_orient *= scale # Uniform scale axis
 
-    parser = C3DParseDictionary(filepath)
 
     if print_file:
         parser.printFile()
@@ -68,12 +75,12 @@ def load(operator, context, filepath="",
 
     if load_mem_efficient:
         # Primarily a test function.
-        read_data_mem_efficient(parser, blen_curves, labels, first_frame, nframes,
+        read_data_mem_efficient(parser, blen_curves, labels, global_orient, first_frame, nframes,
                                 interpolation, min_camera_count, max_residual,
                                 perfmon)
     else:
         # Default processing func.
-        read_data_processor_efficient(parser, blen_curves, labels, first_frame, nframes,
+        read_data_processor_efficient(parser, blen_curves, labels, global_orient, first_frame, nframes,
                                       interpolation, min_camera_count, max_residual,
                                       perfmon)
 
@@ -86,8 +93,15 @@ def load(operator, context, filepath="",
     bpy.context.view_layer.update()
     return {'FINISHED'}
 
+def valid_points(point_block, min_camera_count, max_residual):
+    ''' Determine valid points in a block.
+    '''
+    valid = point_block[:, 4] >= min_camera_count
+    if max_residual > 0.0:
+        valid = np.logical_and(point_block[:, 3] < max_residual, valid)
+    return valid
 
-def read_data_processor_efficient(parser, blen_curves, labels, first_frame, nframes,
+def read_data_processor_efficient(parser, blen_curves, labels, global_orient, first_frame, nframes,
                                   interpolation,
                                   min_camera_count, max_residual,
                                   perfmon):
@@ -95,7 +109,7 @@ def read_data_processor_efficient(parser, blen_curves, labels, first_frame, nfra
     '''
     nlabels = len(labels)
 
-    point_frames = np.zeros([nframes, nlabels, 3], dtype=np.float64)
+    point_frames = np.zeros([nframes, 3, nlabels], dtype=np.float64)
     valid = np.empty([nframes, nlabels], dtype=np.bool)
 
     # Start reading POINT blocks (and analog, but signals from force plates etc. are not supported...)
@@ -107,7 +121,10 @@ def read_data_processor_efficient(parser, blen_curves, labels, first_frame, nfra
         valid[index] = valid_points(points, min_camera_count, max_residual)
 
         # Extract columns 0:3
-        point_frames[index] = points[0:nlabels,0:3]
+        point_frames[index] = points[0:nlabels,0:3].T
+
+    # Re-orient and scale the data
+    point_frames = np.matmul(global_orient, point_frames)
 
     perfmon.level_down('Reading Done.')
 
@@ -124,7 +141,7 @@ def read_data_processor_efficient(parser, blen_curves, labels, first_frame, nfra
 
         # Iterate valid frames and insert keyframes
         indices = frame_range[valid[:, group_ind]]
-        for key_ind, (frame, p) in enumerate(zip(indices, point_frames[indices])):
+        for key_ind, (frame, p) in enumerate(zip(indices, point_frames[indices, :, group_ind])):
             for dim, fc in enumerate(fc_set):
                 kf = fc.keyframe_points[key_ind]
                 kf.co = (frame, p[dim])
@@ -132,16 +149,8 @@ def read_data_processor_efficient(parser, blen_curves, labels, first_frame, nfra
 
     perfmon.level_down('Keyframing Done.')
 
-def valid_points(point_block, min_camera_count, max_residual):
-    ''' Determine valid points in a block.
-    '''
-    valid = point_block[:, 4] >= min_camera_count
-    if max_residual > 0.0:
-        valid = np.logical_and(point_block[:, 3] < max_residual, valid)
-    return valid
-
 def read_data_mem_efficient(parser, blen_curves, labels,
-                            first_frame, nframes,
+                            global_orient, first_frame, nframes,
                             interpolation,
                             min_camera_count, max_residual,
                             perfmon):
@@ -165,13 +174,16 @@ def read_data_mem_efficient(parser, blen_curves, labels,
         # Determine valid samples
         valid = valid_points(points, min_camera_count, max_residual)
 
+        # Re-orient and scale the data
+        opoints = np.matmul(global_orient, points[:, 0:3].T).T
+
         end_sample(read_sampler)
         begin_sample(key_sampler)
 
         index = i - first_frame
 
         # Insert keyframes by iterating over each valid point and channel (x/y/z)
-        for value, fc in zip(points[valid, :3].flat, blen_curves[valid].flat):
+        for value, fc in zip(opoints[valid].flat, blen_curves[valid].flat):
             # Inserting keyframes is veeerry slooooww:
             fc.keyframe_points.insert(i, value, options={'FAST'}).interpolation = interpolation
 

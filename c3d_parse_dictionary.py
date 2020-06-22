@@ -8,7 +8,11 @@ def filter_names(group):
 	for key, value in group.items():
 		if isinstance(key, str):
 			yield key
-
+def islist(N):
+	"""
+	Check if 'N' object is any type of array
+	"""
+	return hasattr(N, '__len__') and (not isinstance(N, str))
 def isvector(param):
 	"""
 	Check if the parameter is composed of single dimensional data.
@@ -111,7 +115,7 @@ class C3DParseDictionary:
 
     """
     --------------------------------------------------------
-                        Parsing functions
+                        Byte Parsing functions
     --------------------------------------------------------
     """
 
@@ -203,6 +207,116 @@ class C3DParseDictionary:
         else:
             return None
     # end parseParamUInt()
+
+    """
+    --------------------------------------------------------
+                        Interpretation
+    --------------------------------------------------------
+    """
+
+    def axis_interpretation(self, sys_axis_up=[0,0,1], sys_axis_forw=[0,1,0]):
+        ''' Interpret X_SCREEN and Y_SCREEN parameters as the axis orientation for the system.
+
+        Params:
+        ----
+        sys_axis_up:   Up axis vector defining convention used for the system (normal to the horizontal ground plane).
+        sys_axis_forw: Forward axis vector defining the full system convention (forward orientation on ground plane).
+        Returns:       3x3 orientation matrix for converting 3D data points.
+        '''
+        # Axis conversion dictionary
+        axis_dict = {
+        'X':[1.0,0,0],
+        '+X':[1.0,0,0],
+        '-X':[-1.0,0,0],
+        'Y':[0,1.0,0],
+        '+Y':[0,1.0,0],
+        '-Y':[0,-1.0,0],
+        'Z':[0,0,1.0],
+        '+Z':[0,0,1.0],
+        '-Z':[0,0,-1.0],
+        }
+        O_data = np.identity(3)
+
+        try:
+            axis_x = self.parseParamString('POINT', 'X_SCREEN')
+            axis_y = self.parseParamString('POINT', 'Y_SCREEN')
+            # Convert
+            if axis_x in axis_dict and axis_y in axis_dict:
+                axis_x = axis_dict[axis_x]
+                axis_y = axis_dict[axis_y]
+            O_data[:, 0] = axis_x
+            O_data[:, 1] = axis_y
+            O_data[:, 2] = np.cross(axis_x, axis_y)
+        except:
+            print('Unable to parse X/Y_SCREEN information for POINT data')
+
+        # Define the system third axis as the cross product:
+        O_sys = np.empty((3,3))
+        O_sys[:, 1] = sys_axis_forw / np.linalg.norm(sys_axis_forw)
+        O_sys[:, 2] = sys_axis_up / np.linalg.norm(sys_axis_up)
+        O_sys[:, 0] = np.cross(O_sys[:, 1], O_sys[:, 2])
+        # Orient from data basis -> system basis
+        return np.matmul(O_sys, O_data.T)
+    # end axis_interpretation()
+
+    def unit_conversion(self, group_id, param_id='UNITS', sys_unit=None):
+        ''' Interpret unit conversion available for a parameter.
+
+        Params:
+        ----
+        group_id:   Parameter group ID (e.g. 'POINTS').
+        param_id:   ID for the parameter itself, default is set to 'UNITS' as it's the standard parameter for recording
+                    measurement units used.
+        sys_unit:   The unit used within the system to which the units should be converted to. Leave as None if it
+                    should be converted to default SI unit.
+
+        Warning! Currently only supports units of length.
+        '''
+        # Unit conversion dictionary
+        unit_dict = {
+        # Metric
+        'm': 1.0,
+        'meter': 1.0,
+        'cm': 1e-2,
+        'centimeter': 1e-3,
+        'mm': 1e-3,
+        'millimeter': 1e-3,
+        # Imperial
+        'in': 254e-4,
+        'inch': 254e-4,
+        'ft': 0.3048,
+        'foot': 0.3048,
+        'yd': 0.9144,
+        'yard': 0.9144,
+        # Default
+        None:1.0
+        }
+        # Conversion factor (scale)
+        conv_fac = 1.0
+        # Convert data from unit defined in 'GROUP.UNITS'
+        try:
+            data_unit = self.parseParamString(group_id, param_id).lower()
+            if islist(data_unit):
+                # Convert a list of units
+                conv_fac = np.ones(len(data_unit))
+                for i, u in enumerate(data_unit):
+                    if u in unit_dict:
+                        conv_fac = unit_dict[u]
+            else:
+                # Convert a single unit string
+                if data_unit in unit_dict:
+                    conv_fac = unit_dict[data_unit]
+        except:
+            print("No unit of length found for %s data." % group_id)
+
+        # Convert data to a specific unit (does not support conversion of different SI units)
+        if type(sys_unit) is str:
+            conv2unit = unit_dict[sys_unit.lower()]
+            conv_fac = conv_fac / conv2unit
+
+        # Return the conversion factor
+        return conv_fac
+
     def parseLabels(self, group_id, param_id='LABELS'):
         """
         Get a list of labels from a group
@@ -212,7 +326,7 @@ class C3DParseDictionary:
 
     """
     --------------------------------------------------------
-                        Parsing Dictionary
+                        Parse Dictionaries
     --------------------------------------------------------
     """
 
@@ -343,5 +457,7 @@ class C3DParseDictionary:
             print("'"+group+"':")
             print("------------------------------")
             self.printParameters(group)
+        #end
+        print("------------------------------")
     # end printFile()
 #end
