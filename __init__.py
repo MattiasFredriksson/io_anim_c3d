@@ -115,9 +115,12 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
         soft_min=0.01, soft_max=1.0,
     )
 
+    # Scale frame rate to match blender frame rate.
+    # This does not reduce the number of keyframes (keyframe reduction through interpolation would be useful)
     adapt_frame_rate: BoolProperty(
             name="Convert Frame Rate",
-            description="Scale frame rate for keyframes in the data to the current Blender frame rate",
+            description="""Scale sample frame rate to the current Blender frame rate.
+                            If False keyframes will be inserted at 1 frame increments""",
             default=True,
             )
 
