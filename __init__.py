@@ -151,7 +151,8 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     # -1: 'is used to indicate that a point is invalid'
     max_residual: FloatProperty(
         name="Maximum Residual", default=0.0,
-        description="Ignore data samples with a residual greater then specified value. If 0 all samples are included. Not all files record marker residuals",
+        description="""Ignore data samples with a residual greater then specified value. If value is equal to 0 all
+                       samples will be included. Note that NOT all files record marker residuals""",
         min=0., max=1000000.0,
         soft_min=0., soft_max=100.0,
     )
@@ -159,7 +160,8 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
 
     min_camera_count: IntProperty(
         name="Min. camera count",
-        description="Minimum number of cameras recording a marker for it to be considered a valid recording (non-occluded). Not all files record visibility counters",
+        description="""Minimum number of cameras recording a marker for it to be considered a valid recording
+                       (non-occluded). Note that NOT all files record visibility counters""",
         min=0, max=10,
         default=0,
         )
