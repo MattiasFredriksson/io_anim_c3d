@@ -13,11 +13,11 @@ def load(operator, context, filepath="",
          bone_size=0.02,
          fake_user=True,
          interpolation='LINEAR',
-         occlude_invalid = True,
          min_camera_count = 0,
          max_residual=0.0,
          load_mem_efficient=False,
          print_file=True):
+
     from bpy_extras.io_utils import axis_conversion
     from .c3d_parse_dictionary import C3DParseDictionary
     from . perfmon import PerfMon
@@ -62,7 +62,7 @@ def load(operator, context, filepath="",
 
     # Create an armature adapted to the data (if specified)
     arm_obj = None
-    bone_radius = bone_size * 0.2
+    bone_radius = bone_size * 0.5
     if create_armature:
         arm_obj = create_armature_object(context, file_name, 'BBONE')
         add_empty_armature_bones(context, arm_obj, labels, bone_size)

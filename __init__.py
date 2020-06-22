@@ -89,30 +89,35 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
             type=bpy.types.OperatorFileListElement,
             )
 
+    use_manual_orientation: BoolProperty(
+            name="Manual Orientation",
+            description="Specify orientation manually rather then use interpretations from embedded data",
+            default=False,
+            )
+
     global_scale: FloatProperty(
             name="Scale",
+            description="Scaling factor applied to geometric (spatial) data, multiplied with other (embedded) factors",
             min=0.001, max=1000.0,
             default=1.0,
             )
 
-
     create_armature: BoolProperty(
             name="Create Armature",
-            description="Generate an armature for the data.",
+            description="Generate an armature for the data",
             default=True,
             )
 
     bone_size: FloatProperty(
         name="Marker Size", default=0.02,
-        description="Define the width of each marker.",
+        description="Define the width of each marker",
         min=0.001, max=10.0,
         soft_min=0.01, soft_max=1.0,
     )
 
-
     fake_user: BoolProperty(
-            name="Set Fake User",
-            description="If the fake user flag for generated actions should be set.",
+            name="Fake User",
+            description="True to set the fake user flag for generated action sequence(s)",
             default=True,
             )
 
@@ -121,21 +126,22 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     # https://docs.blender.org/api/current/bpy.types.Keyframe.html#bpy.types.Keyframe.interpolation
     interpolation: EnumProperty(
             items=(
-            ('CONSTANT', "Constant", "Constant, No interpolation."),
-            ('LINEAR', "Linear", "Linear interpolation."),
-            ('BEZIER', "Bezier", "Smooth interpolation between A and B, with some control over curve shape."),
-            #('SINE', "Sinusoidal", "Sinusoidal easing (weakest, almost linear but with a slight curvature)."),
-            ('QUAD', "Quadratic", "Quadratic easing."),
-            ('CUBIC', "Cubic", "Cubic easing."),
-            #('QUART', "Quartic", "Quartic easing."),
-            #('QUINT', "Quintic", "Quintic easing."),
-            ('CIRC', "Circular", "Circular easing (strongest and most dynamic)."),
-            #('BOUNCE', "Bounce", "Exponentially decaying parabolic bounce, like when objects collide."),
+            ('CONSTANT', "Constant", "Constant, No interpolation"),
+            ('LINEAR', "Linear", "Linear interpolation"),
+            ('BEZIER', "Bezier", "Smooth interpolation between A and B, with some control over curve shape"),
+            #('SINE', "Sinusoidal", "Sinusoidal easing (weakest, almost linear but with a slight curvature)"),
+            ('QUAD', "Quadratic", "Quadratic easing"),
+            ('CUBIC', "Cubic", "Cubic easing"),
+            #('QUART', "Quartic", "Quartic easing"),
+            #('QUINT', "Quintic", "Quintic easing"),
+            ('CIRC', "Circular", "Circular easing (strongest and most dynamic)"),
+            #('BOUNCE', "Bounce", "Exponentially decaying parabolic bounce, like when objects collide"),
             # Options with specific settings
-            #('BACK', "Back", "Cubic easing with overshoot and settle."),
-            #('ELASTIC', "Elastic", "Exponentially decaying sine wave, like an elastic band."),
+            #('BACK', "Back", "Cubic easing with overshoot and settle"),
+            #('ELASTIC', "Elastic", "Exponentially decaying sine wave, like an elastic band"),
             ),
             name="Interpolation",
+            description="Keyframe interpolation",
             default='LINEAR'
             )
 
@@ -145,7 +151,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     # -1: 'is used to indicate that a point is invalid'
     max_residual: FloatProperty(
         name="Maximum Residual", default=0.0,
-        description="Ignore data samples with a residual greater then specified value. If 0 all samples are included.",
+        description="Ignore data samples with a residual greater then specified value. If 0 all samples are included. Not all files record marker residuals",
         min=0., max=1000000.0,
         soft_min=0., soft_max=100.0,
     )
@@ -153,17 +159,10 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
 
     min_camera_count: IntProperty(
         name="Minimum camera count",
-        description="Minimum number of cameras recording a marker for it to be considered a valid recording (non-occluded). Not all files record visibility counters.",
+        description="Minimum number of cameras recording a marker for it to be considered a valid recording (non-occluded). Not all files record visibility counters",
         min=0, max=10,
         default=0,
         )
-
-    # This is probably a redundant setting as an invalid point is generally not recorded by a camera
-    occlude_invalid: BoolProperty(
-            name="Occlude Invalid",
-            description="Handle invalid points as occluded",
-            default=True,
-            )
 
     def draw(self, context):
         pass
@@ -187,6 +186,127 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
 
 
 #######################
+# Panels
+######################
+
+class C3D_PT_action(bpy.types.Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+    bl_label = "Import Action"
+    bl_parent_id = "FILE_PT_operator"
+
+    @classmethod
+    def poll(cls, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        return operator.bl_idname == "IMPORT_ANIM_OT_c3d"
+
+    def draw_header(self, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False  # No animation.
+
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        layout.prop(operator, "fake_user")
+        layout.prop(operator, "interpolation")
+        layout.prop(operator, "min_camera_count")
+        layout.prop(operator, "max_residual")
+
+class C3D_PT_marker_armature(bpy.types.Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+    bl_label = "Create Armature"
+    bl_parent_id = "FILE_PT_operator"
+
+    @classmethod
+    def poll(cls, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        return operator.bl_idname == "IMPORT_ANIM_OT_c3d"
+
+    def draw_header(self, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        self.layout.prop(operator, "create_armature", text="")
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False  # No animation.
+
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        layout.enabled = operator.create_armature
+
+        layout.prop(operator, "bone_size")
+
+class C3D_PT_import_transform(bpy.types.Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+    bl_label = "Transform"
+    bl_parent_id = "FILE_PT_operator"
+
+    @classmethod
+    def poll(cls, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        return operator.bl_idname == "IMPORT_ANIM_OT_c3d"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False  # No animation.
+
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        layout.prop(operator, "global_scale")
+
+class C3D_PT_import_transform_manual_orientation(bpy.types.Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+    bl_label = "Manual Orientation"
+    bl_parent_id = "C3D_PT_import_transform"
+
+    @classmethod
+    def poll(cls, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        return operator.bl_idname == "IMPORT_ANIM_OT_c3d"
+
+    def draw_header(self, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        self.layout.prop(operator, "use_manual_orientation", text="")
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False  # No animation.
+
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        layout.enabled = operator.use_manual_orientation
+
+        layout.prop(operator, "axis_forward")
+        layout.prop(operator, "axis_up")
+
+
+#######################
 # Register Menu Items
 #######################
 
@@ -201,14 +321,18 @@ def menu_func_import(self, context):
 # Register Operator
 #######################
 
-operators = (
+classes = (
     ImportC3D,
+    C3D_PT_action,
+    C3D_PT_marker_armature,
+    C3D_PT_import_transform,
+    C3D_PT_import_transform_manual_orientation,
     #ExportC3D,
 )
 
 def register():
-    for op in operators:
-        bpy.utils.register_class(op)
+    for cl in classes:
+        bpy.utils.register_class(cl)
 
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
     #bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
@@ -218,8 +342,8 @@ def unregister():
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
     #bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
 
-    for op in operators:
-        bpy.utils.unregister_class(op)
+    for cl in classes:
+        bpy.utils.unregister_class(cl)
 
 
 if __name__ == "__main__":
