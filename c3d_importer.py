@@ -11,6 +11,7 @@ def load(operator, context, filepath="",
          global_scale=1.0,
          create_armature=True,
          bone_size=0.02,
+         adapt_frame_rate=True,
          fake_user=True,
          interpolation='LINEAR',
          min_camera_count = 0,
@@ -33,10 +34,17 @@ def load(operator, context, filepath="",
     # Open file and read parameter headers
     parser = C3DParseDictionary(filepath)
 
-    unit_conv_fac = unit_conversion(parser, 'POINT', sys_unit='m')
+    # Frame rate conversion factor
+    conv_fac_frame_rate = 1.0
+    if adapt_frame_rate:
+        conv_fac_frame_rate = bpy.context.scene.render.fps / parser.frame_rate
+
+    # Conversion factor for length measurements
+    blend_units = 'm'
+    conv_fac_spatial_unit = unit_conversion(parser, 'POINT', sys_unit=blend_units)
 
     # World orientation adjustment
-    scale = global_scale*unit_conv_fac
+    scale = global_scale*conv_fac_spatial_unit
     if use_manual_orientation:
         global_orient = axis_conversion(from_forward=axis_forward, from_up=axis_up)
         global_orient = global_orient @ mathutils.Matrix.Scale(scale, 3)
@@ -80,14 +88,16 @@ def load(operator, context, filepath="",
 
     if load_mem_efficient:
         # Primarily a test function.
-        read_data_mem_efficient(parser, blen_curves, labels, global_orient, first_frame, nframes,
-                                interpolation, min_camera_count, max_residual,
-                                perfmon)
-    else:
-        # Default processing func.
-        read_data_processor_efficient(parser, blen_curves, labels, global_orient, first_frame, nframes,
+        read_data_mem_efficient(parser, blen_curves, labels, global_orient,
+                                      first_frame, nframes, conv_fac_frame_rate,
                                       interpolation, min_camera_count, max_residual,
                                       perfmon)
+    else:
+        # Default processing func.
+        read_data_processor_efficient(parser, blen_curves, labels, global_orient,
+                                          first_frame, nframes, conv_fac_frame_rate,
+                                          interpolation, min_camera_count, max_residual,
+                                          perfmon)
 
     # Since we inserted our keyframes in 'FAST' mode, we have to update the fcurves now.
     for fc in blen_curves_arr:
@@ -106,10 +116,10 @@ def valid_points(point_block, min_camera_count, max_residual):
         valid = np.logical_and(point_block[:, 3] < max_residual, valid)
     return valid
 
-def read_data_processor_efficient(parser, blen_curves, labels, global_orient, first_frame, nframes,
-                                  interpolation,
-                                  min_camera_count, max_residual,
-                                  perfmon):
+def read_data_processor_efficient(parser, blen_curves, labels, global_orient,
+                                    first_frame, nframes, conv_fac_frame_rate,
+                                    interpolation, min_camera_count, max_residual,
+                                    perfmon):
     '''Read and keyframe POINT data.
     '''
     nlabels = len(labels)
@@ -149,15 +159,15 @@ def read_data_processor_efficient(parser, blen_curves, labels, global_orient, fi
         for key_ind, (frame, p) in enumerate(zip(indices, point_frames[indices, :, group_ind])):
             for dim, fc in enumerate(fc_set):
                 kf = fc.keyframe_points[key_ind]
-                kf.co = (frame, p[dim])
+                kf.co = (frame * conv_fac_frame_rate, p[dim])
                 kf.interpolation = interpolation
 
     perfmon.level_down('Keyframing Done.')
 
-def read_data_mem_efficient(parser, blen_curves, labels, global_orient, first_frame, nframes,
-                            interpolation,
-                            min_camera_count, max_residual,
-                            perfmon):
+def read_data_mem_efficient(parser, blen_curves, labels, global_orient,
+                                first_frame, nframes, conv_fac_frame_rate,
+                                interpolation, min_camera_count, max_residual,
+                                perfmon):
     '''Read POINT data block by block, inserting keyframes for a .c3d block at a time.
 
     Note:
@@ -185,11 +195,12 @@ def read_data_mem_efficient(parser, blen_curves, labels, global_orient, first_fr
         begin_sample(key_sampler)
 
         index = i - first_frame
+        frame = i * conv_fac_frame_rate
 
         # Insert keyframes by iterating over each valid point and channel (x/y/z)
         for value, fc in zip(opoints[valid].flat, blen_curves[valid].flat):
             # Inserting keyframes is veeerry slooooww:
-            fc.keyframe_points.insert(i, value, options={'FAST'}).interpolation = interpolation
+            fc.keyframe_points.insert(frame, value, options={'FAST'}).interpolation = interpolation
 
             # Fast insert that are added first, generates empty keyframes complicated to get rid of,
             # hence the number of keyframes must be known when using this method.

@@ -115,6 +115,12 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
         soft_min=0.01, soft_max=1.0,
     )
 
+    adapt_frame_rate: BoolProperty(
+            name="Convert Frame Rate",
+            description="Scale frame rate for keyframes in the data to the current Blender frame rate",
+            default=True,
+            )
+
     fake_user: BoolProperty(
             name="Fake User",
             description="True to set the fake user flag for generated action sequence(s)",
@@ -228,6 +234,7 @@ class C3D_PT_action(bpy.types.Panel):
         sfile = context.space_data
         operator = sfile.active_operator
 
+        layout.prop(operator, "adapt_frame_rate")
         layout.prop(operator, "fake_user")
         layout.prop(operator, "interpolation")
         layout.prop(operator, "min_camera_count")
@@ -238,6 +245,7 @@ class C3D_PT_marker_armature(bpy.types.Panel):
     bl_region_type = 'TOOL_PROPS'
     bl_label = "Create Armature"
     bl_parent_id = "FILE_PT_operator"
+    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
