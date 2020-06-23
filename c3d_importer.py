@@ -1,7 +1,31 @@
-import mathutils, bpy
+# ##### BEGIN GPL LICENSE BLOCK #####
+#
+#  This program is free software; you can redistribute it and/or
+#  modify it under the terms of the GNU General Public License
+#  as published by the Free Software Foundation; either version 2
+#  of the License, or (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software Foundation,
+#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+#
+# ##### END GPL LICENSE BLOCK #####
+
+# Script copyright (C) Mattias Fredriksson
+
+# pep8 compliancy:
+#   flake8 .\c3d_importer.py
+
+import mathutils
+import bpy
 import os
 import numpy as np
-from . pyfuncs import *
+from .pyfuncs import islist
 
 
 def load(operator, context, filepath="",
@@ -14,7 +38,7 @@ def load(operator, context, filepath="",
          adapt_frame_rate=True,
          fake_user=True,
          interpolation='LINEAR',
-         min_camera_count = 0,
+         min_camera_count=0,
          max_residual=0.0,
          load_mem_efficient=False,
          print_file=True):
@@ -44,16 +68,15 @@ def load(operator, context, filepath="",
     conv_fac_spatial_unit = parser.unit_conversion('POINT', sys_unit=blend_units)
 
     # World orientation adjustment
-    scale = global_scale*conv_fac_spatial_unit
+    scale = global_scale * conv_fac_spatial_unit
     if use_manual_orientation:
         global_orient = axis_conversion(from_forward=axis_forward, from_up=axis_up)
         global_orient = global_orient @ mathutils.Matrix.Scale(scale, 3)
         # Convert to a numpy array matrix
         global_orient = np.array(global_orient)
     else:
-        global_orient = parser.axis_interpretation([0,0,1], [0,1,0])
-        global_orient *= scale # Uniform scale axis
-
+        global_orient = parser.axis_interpretation([0, 0, 1], [0, 1, 0])
+        global_orient *= scale  # Uniform scale axis
 
     if print_file:
         parser.printFile()
@@ -78,7 +101,6 @@ def load(operator, context, filepath="",
             bone.bbone_x = bone_radius
             bone.bbone_z = bone_radius
 
-
     # Create an action
     action = create_action(file_name, arm_obj, fake_user)
     # Generate location (x,y,z) F-Curves for each label
@@ -89,15 +111,15 @@ def load(operator, context, filepath="",
     if load_mem_efficient:
         # Primarily a test function.
         read_data_mem_efficient(parser, blen_curves, labels, global_orient,
-                                      first_frame, nframes, conv_fac_frame_rate,
-                                      interpolation, min_camera_count, max_residual,
-                                      perfmon)
+                                first_frame, nframes, conv_fac_frame_rate,
+                                interpolation, min_camera_count, max_residual,
+                                perfmon)
     else:
         # Default processing func.
         read_data_processor_efficient(parser, blen_curves, labels, global_orient,
-                                          first_frame, nframes, conv_fac_frame_rate,
-                                          interpolation, min_camera_count, max_residual,
-                                          perfmon)
+                                      first_frame, nframes, conv_fac_frame_rate,
+                                      interpolation, min_camera_count, max_residual,
+                                      perfmon)
 
     # Since we inserted our keyframes in 'FAST' mode, we have to update the fcurves now.
     for fc in blen_curves_arr:
@@ -108,6 +130,7 @@ def load(operator, context, filepath="",
     bpy.context.view_layer.update()
     return {'FINISHED'}
 
+
 def valid_points(point_block, min_camera_count, max_residual):
     ''' Determine valid points in a block.
     '''
@@ -116,10 +139,11 @@ def valid_points(point_block, min_camera_count, max_residual):
         valid = np.logical_and(point_block[:, 3] < max_residual, valid)
     return valid
 
+
 def read_data_processor_efficient(parser, blen_curves, labels, global_orient,
-                                    first_frame, nframes, conv_fac_frame_rate,
-                                    interpolation, min_camera_count, max_residual,
-                                    perfmon):
+                                  first_frame, nframes, conv_fac_frame_rate,
+                                  interpolation, min_camera_count, max_residual,
+                                  perfmon):
     '''Read and keyframe POINT data.
     '''
     nlabels = len(labels)
@@ -136,7 +160,7 @@ def read_data_processor_efficient(parser, blen_curves, labels, global_orient,
         valid[index] = valid_points(points, min_camera_count, max_residual)
 
         # Extract columns 0:3
-        point_frames[index] = points[0:nlabels,0:3].T
+        point_frames[index] = points[0:nlabels, 0:3].T
 
     # Re-orient and scale the data
     point_frames = np.matmul(global_orient, point_frames)
@@ -164,10 +188,11 @@ def read_data_processor_efficient(parser, blen_curves, labels, global_orient,
 
     perfmon.level_down('Keyframing Done.')
 
+
 def read_data_mem_efficient(parser, blen_curves, labels, global_orient,
-                                first_frame, nframes, conv_fac_frame_rate,
-                                interpolation, min_camera_count, max_residual,
-                                perfmon):
+                            first_frame, nframes, conv_fac_frame_rate,
+                            interpolation, min_camera_count, max_residual,
+                            perfmon):
     '''Read POINT data block by block, inserting keyframes for a .c3d block at a time.
 
     Note:
@@ -177,10 +202,9 @@ def read_data_mem_efficient(parser, blen_curves, labels, global_orient,
     1. Test and/or example case for how the code could be written.
     2. Provide memory efficient loading, currently it's useless due to the processing time but that might change.
     '''
+    from . perfmon import new_sampler, begin_sample, end_sample, analyze_sample
 
     perfmon.level_up('Processing POINT data..', True)
-
-
     read_sampler, key_sampler = new_sampler(True), new_sampler()
 
     for i, points, analog in parser.reader.read_frames(copy=False):
@@ -194,7 +218,7 @@ def read_data_mem_efficient(parser, blen_curves, labels, global_orient,
         end_sample(read_sampler)
         begin_sample(key_sampler)
 
-        index = i - first_frame
+        # index = i - first_frame
         frame = i * conv_fac_frame_rate
 
         # Insert keyframes by iterating over each valid point and channel (x/y/z)
@@ -204,9 +228,9 @@ def read_data_mem_efficient(parser, blen_curves, labels, global_orient,
 
             # Fast insert that are added first, generates empty keyframes complicated to get rid of,
             # hence the number of keyframes must be known when using this method.
-            #kf = fc.keyframe_points[index]
-            #kf.co = (i, value)
-            #kf.interpolation = interpolation
+            # kf = fc.keyframe_points[index]
+            # kf.co = (i, value)
+            # kf.interpolation = interpolation
 
         end_sample(key_sampler)
         begin_sample(read_sampler)
@@ -219,8 +243,16 @@ def read_data_mem_efficient(parser, blen_curves, labels, global_orient,
     perfmon.message('File read (tot, mean):  %0.3f \t %f (s)' % (rtot, rmean))
     perfmon.message('Key insert (tot, mean): %0.3f \t %f (s)' % (ktot, kmean))
 
+
 def create_action(action_name, object=None, fake_user=False):
-    # Create new action.
+    ''' Create new action.
+
+    Params:
+    -----
+    action_name:    Name for the action
+    object:         Set the action as the active animation data for the object.
+    fake_user:      Set the 'Fake User' flag for the action.
+    '''
 
     action = bpy.data.actions.new(action_name)
     action.use_fake_user = fake_user
@@ -233,7 +265,16 @@ def create_action(action_name, object=None, fake_user=False):
             object.animation_data.action = action
     return action
 
+
 def create_armature_object(context, name, display_type='OCTAHEDRAL'):
+    ''' Create an 'ARMATURE' object and add to active layer
+
+    Params:
+    -----
+    context:        Blender Context
+    name:           Name for the object
+    display_type:   Display type for the armature bones.
+    '''
     arm_data = bpy.data.armatures.new(name=name)
     arm_data.display_type = display_type
 
@@ -241,9 +282,20 @@ def create_armature_object(context, name, display_type='OCTAHEDRAL'):
 
     # Instance in scene.
     context.view_layer.active_layer_collection.collection.objects.link(arm_obj)
-
-
     return arm_obj
+
+
+def enter_clean_object_mode():
+    ''' Enter object mode and clear any selection.
+    '''
+    # Try to enter object mode, polling active object is unreliable since an object can be in edit mode but not active!
+    try:
+        bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+    except RuntimeError:
+        pass
+    # Clear any selection
+    bpy.ops.object.select_all(action='DESELECT')
+
 
 def add_empty_armature_bones(context, arm_obj, bone_names, length=0.1):
     '''
@@ -258,13 +310,8 @@ def add_empty_armature_bones(context, arm_obj, bone_names, length=0.1):
 
     assert arm_obj.type == 'ARMATURE', "Object passed to 'add_empty_armature_bones()' must be an armature."
 
-    # Try to enter object mode, polling active object is unreliable since an object can be in edit mode but not active!
-    try:
-        bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
-    except:
-        pass
-    # Clear any selection
-    bpy.ops.object.select_all(action='DESELECT')
+    # Enter object mode
+    enter_clean_object_mode()
     # Enter edit mode for the armature
     arm_obj.select_set(True)
     bpy.context.view_layer.objects.active = arm_obj
@@ -282,6 +329,7 @@ def add_empty_armature_bones(context, arm_obj, bone_names, length=0.1):
         b.tail = (0.0, 0.0, length)
 
     bpy.ops.object.mode_set(mode='OBJECT')
+
 
 def generate_blend_curves(action, labels, grp_channel_count, fc_data_path_str):
     '''
@@ -309,15 +357,16 @@ def generate_blend_curves(action, labels, grp_channel_count, fc_data_path_str):
     '''
 
     # Convert label to iterable tuple
-    if not islist(labels): labels = (labels)
+    if not islist(labels):
+        labels = (labels)
 
     # Generate channels for each label to hold location information
     if '%s' not in fc_data_path_str:
         # No format operator found in the data_path_str used to define F-curves.
         blen_curves = [action.fcurves.new(fc_data_path_str, index=i, action_group=label)
-                        for label in labels for i in range(grp_channel_count)]
+                       for label in labels for i in range(grp_channel_count)]
     else:
         # Format operator found, replace it with label associated with the created F-Curve
-        blen_curves = [action.fcurves.new(fc_data_path_str%label, index=i, action_group=label)
-                        for label in labels for i in range(grp_channel_count)]
+        blen_curves = [action.fcurves.new(fc_data_path_str % label, index=i, action_group=label)
+                       for label in labels for i in range(grp_channel_count)]
     return blen_curves

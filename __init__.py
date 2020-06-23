@@ -16,6 +16,8 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+# Script copyright (C) Mattias Fredriksson
+
 # pep8 compliancy:
 #   flake8 --ignore E402,F821,F722 .\__init__.py
 
