@@ -206,6 +206,12 @@ class C3DParseDictionary:
 
     def parseParamString(self, group_id, param_id):
         ''' Get a string or list of strings from the specified parameter.
+
+        Params:
+        ----
+        group_id:   Parameter group id.
+        Param_id:   Parameter id.
+        Returns:    String or array of strings.
         '''
         param = self.getParam(group_id, param_id)
         if param is None:
@@ -214,6 +220,12 @@ class C3DParseDictionary:
 
     def parseParamFloat(self, group_id, param_id):
         ''' Get a ndarray of integers from a group parameter.
+
+        Params:
+        ----
+        group_id:   Parameter group id.
+        Param_id:   Parameter id.
+        Returns:    Float value or an array of float values.
         '''
         param = self.getParam(group_id, param_id)
         if(param is None):
@@ -227,6 +239,12 @@ class C3DParseDictionary:
 
     def parseParamInt(self, group_id, param_id):
         ''' Get a ndarray of integers from a group parameter.
+
+        Params:
+        ----
+        group_id:   Parameter group id.
+        Param_id:   Parameter id.
+        Returns:    Integer value or an array of int values.
         '''
         param = self.getParam(group_id, param_id)
         if(param is None):
@@ -246,6 +264,12 @@ class C3DParseDictionary:
 
     def parseParamUInt(self, group_id, param_id):
         ''' Get a ndarray of integers from a group parameter.
+
+        Params:
+        ----
+        group_id:   Parameter group id.
+        Param_id:   Parameter id.
+        Returns:    Unsigned integer value or an array of uint values.
         '''
         param = self.getParam(group_id, param_id)
         if(param is None):
@@ -264,7 +288,13 @@ class C3DParseDictionary:
             return None
 
     def parseParamAnyInteger(self, group_id, param_id):
-        ''' Evaluate any possible conversion of the parameter to a 32 bit unsigned integer representation.
+        ''' Evaluate any reasonable conversion of the parameter to a 32 bit unsigned integer representation.
+
+        Params:
+        ----
+        group_id:   Parameter group id.
+        Param_id:   Parameter id.
+        Returns:    Integer value or an array of int values.
         '''
         param = self.getParam(group_id, param_id)
         if(param is None):
@@ -272,7 +302,13 @@ class C3DParseDictionary:
         return param._as_integer_value
 
     def parseParamUInt_32(self, group_id, param_id):
-        ''' Get a single 32 bit unsigned integers from a group parameter.
+        ''' Get a single 32 bit unsigned integers from a parameter group.
+
+        Params:
+        ----
+        group_id:   Parameter group id.
+        Param_id:   Parameter id.
+        Returns:    First 32 bits interpreted as an unsigned integer value.
         '''
         param = self.getParam(group_id, param_id)
         if(param is None):
@@ -280,7 +316,13 @@ class C3DParseDictionary:
         return param.uint32_value
 
     def parseParamFloat_32(self, group_id, param_id):
-        ''' Get a single 32 bit floating point from a group parameter.
+        ''' Get a single 32 bit floating point from a parameter group.
+
+        Params:
+        ----
+        group_id:   Parameter group id.
+        Param_id:   Parameter id.
+        Returns:    First 32 bits interpreted as an floating point value.
         '''
         param = self.getParam(group_id, param_id)
         if(param is None):
@@ -295,14 +337,17 @@ class C3DParseDictionary:
 
     @property
     def first_frame(self):
+        ''' Get index of the first recorded frame. '''
         return self.reader.first_frame()
 
     @property
     def last_frame(self):
+        ''' Get index of the last recorded frame. '''
         return self.reader.last_frame()
 
     @property
     def frame_rate(self):
+        ''' Get the frame rate for the data sequence. '''
         return max(1.0, self.reader.header.frame_rate)
 
     """

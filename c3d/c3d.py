@@ -386,7 +386,7 @@ class Param(object):
             value = self.float_value
             # Check if float value representation is an integer
             if int(value) == value:
-                return value
+                return int(value)
             return self.uint32_value
         elif self.total_bytes >= 2:
             return self.uint16_value
