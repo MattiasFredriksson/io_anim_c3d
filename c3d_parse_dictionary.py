@@ -430,7 +430,23 @@ class C3DParseDictionary:
                 labels.append(plabels)
             elif plabels is not None:  # is string
                 labels.append([plabels])
-        return np.concatenate(labels)
+        labels = np.concatenate(labels)
+
+        # Make labels unique
+        unique_labels, indices, count =  np.unique(labels, return_inverse=True, return_counts=True)
+        N = len(indices)
+        counter = np.zeros(N, np.int32)
+        for i in range(N):
+            index = indices[i]
+            if count[index] > 1:
+                counter[index] += 1
+                postfix = '_%00i' % counter[index]
+                if labels[i] is '':
+                    labels[i] = 'EMPTY' + postfix
+                else:
+                    labels[i] += postfix
+
+        return labels
 
     """
     --------------------------------------------------------

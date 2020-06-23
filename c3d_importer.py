@@ -81,8 +81,14 @@ def load(operator, context, filepath="",
     if print_file:
         parser.printFile()
 
+    # Read labels
     labels = parser.parseLabels('POINT')
+    # Determine used label count
     nlabels = len(labels)
+    used_label_count = parser.tryParseParam('POINT', 'USED')
+    if nlabels is not None:
+        labels = labels[:used_label_count]
+        nlabels = used_label_count
 
     # Number of frames [first, last] => +1
     # first_frame is the frame index to start parsing from
