@@ -356,7 +356,7 @@ def generate_blend_curves(action, labels, grp_channel_count, fc_data_path_str):
 
     '''
 
-    # Convert label to iterable tuple
+    # Convert a single label to an iterable tuple (list)
     if not islist(labels):
         labels = (labels)
 

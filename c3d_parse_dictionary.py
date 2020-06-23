@@ -202,7 +202,7 @@ class C3DParseDictionary:
         """
         param = self.getParam(group_id, param_id)
         if param is None:
-            raise RuntimeError("Param ", param_id, " not Found in group ", group_id)
+            raise None
         return parseC3DString(param)
 
     def parseParamFloat(self, group_id, param_id):
@@ -299,17 +299,16 @@ class C3DParseDictionary:
             }
         O_data = np.identity(3)
 
-        try:
-            axis_x = self.parseParamString('POINT', 'X_SCREEN')
-            axis_y = self.parseParamString('POINT', 'Y_SCREEN')
-            # Convert
-            if axis_x in axis_dict and axis_y in axis_dict:
-                axis_x = axis_dict[axis_x]
-                axis_y = axis_dict[axis_y]
+        axis_x = self.parseParamString('POINT', 'X_SCREEN')
+        axis_y = self.parseParamString('POINT', 'Y_SCREEN')
+        # Convert
+        if axis_x in axis_dict and axis_y in axis_dict:
+            axis_x = axis_dict[axis_x]
+            axis_y = axis_dict[axis_y]
             O_data[:, 0] = axis_x
             O_data[:, 1] = axis_y
             O_data[:, 2] = np.cross(axis_x, axis_y)
-        except RuntimeError:
+        else:
             print('Unable to parse X/Y_SCREEN information for POINT data')
 
         # Define the system third axis as the cross product:
@@ -356,8 +355,8 @@ class C3DParseDictionary:
         # Conversion factor (scale)
         conv_fac = 1.0
         # Convert data from unit defined in 'GROUP.UNITS'
-        try:
-            data_unit = self.parseParamString(group_id, param_id).lower()
+        data_unit = self.parseParamString(group_id, param_id).lower()
+        if data_unit is not None:
             if islist(data_unit):
                 # Convert a list of units
                 conv_fac = np.ones(len(data_unit))
@@ -368,7 +367,7 @@ class C3DParseDictionary:
                 # Convert a single unit string
                 if data_unit in unit_dict:
                     conv_fac = unit_dict[data_unit]
-        except RuntimeError:
+        else:
             print("No unit of length found for %s data." % group_id)
 
         # Convert data to a specific unit (does not support conversion of different SI units)
@@ -379,11 +378,27 @@ class C3DParseDictionary:
         # Return the conversion factor
         return conv_fac
 
-    def parseLabels(self, group_id, param_id='LABELS'):
-        """
-        Get a list of labels from a group
-        """
-        return self.parseParamString(group_id, param_id)
+    def parseLabels(self, group_id, param_ids=['LABELS', 'LABELS2']):
+        ''' Get a list of labels from a group.
+
+        Params:
+        ----
+        group_id:   Group from which the labels should be parsed.
+        param_ids:  List of parameter identifiers for which label information is stored.
+        Returns:    Python list of label strings.
+        '''
+        if not islist(param_ids):
+            param_ids = [param_ids]
+
+        labels = []
+        for pid in param_ids:
+            plabels = self.parseParamString(group_id, pid)
+            print(type(plabels))
+            if islist(plabels):
+                labels = np.concatenate((labels, plabels))
+            elif plabels is not None:
+                labels = np.concatenate((labels, (plabels)))
+        return labels
     # end parseLabels()
 
     """

@@ -39,7 +39,17 @@ bl_info = {
 #######################
 if "bpy" in locals():
     import importlib
-    # Ensure dependency order is correct (to ensure a dependency is updated it must be reloaded first)
+    # Ensure dependency order is correct, to ensure a dependency is updated it must be reloaded first.
+    # If imports are done in functions the modules seem to be linked correctly however.
+    # ---
+    # Reload subdirectory package?
+    if "c3d" in locals():
+        importlib.reload(c3d)
+    # Reload the sub-pacakge modules
+    from .c3d import reload as reload_sub
+    reload_sub()
+    # ---
+    # Reload directory modules
     if "pyfuncs" in locals():
         importlib.reload(pyfuncs)
     if "perfmon" in locals():
@@ -48,9 +58,6 @@ if "bpy" in locals():
         importlib.reload(c3d_parse_dictionary)
     if "c3d_importer" in locals():
         importlib.reload(c3d_importer)
-    # Reload subdirectory
-    from .c3d import __init__ as c3d_init
-    importlib.reload(c3d_init)  # Reload the module (updates any change in the __init__ file)
 
 import bpy
 from bpy.props import (
