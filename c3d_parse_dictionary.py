@@ -296,9 +296,11 @@ class C3DParseDictionary:
     @property
     def first_frame(self):
         return self.reader.first_frame()
+
     @property
     def last_frame(self):
         return self.reader.last_frame()
+
     @property
     def frame_rate(self):
         return max(1.0, self.reader.header.frame_rate)
@@ -411,7 +413,7 @@ class C3DParseDictionary:
         # Return the conversion factor
         return conv_fac
 
-    def parseLabels(self, group_id, param_ids=['LABELS', 'LABELS2']):
+    def parseLabels(self, group_id, param_ids=['LABELS', 'LABELS2'], make_unique=True):
         ''' Get a list of labels from a group.
 
         Params:
@@ -433,18 +435,19 @@ class C3DParseDictionary:
         labels = np.concatenate(labels)
 
         # Make labels unique
-        unique_labels, indices, count =  np.unique(labels, return_inverse=True, return_counts=True)
-        N = len(indices)
-        counter = np.zeros(N, np.int32)
-        for i in range(N):
-            index = indices[i]
-            if count[index] > 1:
-                counter[index] += 1
-                postfix = '_%00i' % counter[index]
-                if labels[i] is '':
-                    labels[i] = 'EMPTY' + postfix
-                else:
-                    labels[i] += postfix
+        if make_unique:
+            unique_labels, indices, count = np.unique(labels, return_inverse=True, return_counts=True)
+            N = len(indices)
+            counter = np.zeros(N, np.int32)
+            for i in range(N):
+                index = indices[i]
+                if count[index] > 1:
+                    counter[index] += 1
+                    postfix = '_%00i' % counter[index]
+                    if labels[i] == '':
+                        labels[i] = 'EMPTY' + postfix
+                    else:
+                        labels[i] += postfix
 
         return labels
 
