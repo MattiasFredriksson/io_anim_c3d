@@ -1,4 +1,4 @@
-# Alpha Version
+# Pre-Alpha Version
 # io_anim_c3d
 Blender addon for importing .c3d files
 
