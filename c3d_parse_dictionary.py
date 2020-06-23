@@ -202,7 +202,7 @@ class C3DParseDictionary:
         """
         param = self.getParam(group_id, param_id)
         if param is None:
-            raise None
+            return None
         return parseC3DString(param)
 
     def parseParamFloat(self, group_id, param_id):
@@ -393,12 +393,11 @@ class C3DParseDictionary:
         labels = []
         for pid in param_ids:
             plabels = self.parseParamString(group_id, pid)
-            print(type(plabels))
             if islist(plabels):
-                labels = np.concatenate((labels, plabels))
-            elif plabels is not None:
-                labels = np.concatenate((labels, (plabels)))
-        return labels
+                labels.append(plabels)
+            elif plabels is not None:  # is string
+                labels.append([plabels])
+        return np.concatenate(labels)
     # end parseLabels()
 
     """
