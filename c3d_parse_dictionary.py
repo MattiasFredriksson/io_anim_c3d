@@ -1,5 +1,8 @@
 import numpy as np
 
+###############
+# Standalone module to interface with the parser for the .c3d format
+###############
 
 def filter_names(group):
 	"""

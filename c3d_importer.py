@@ -41,7 +41,7 @@ def load(operator, context, filepath="",
 
     # Conversion factor for length measurements
     blend_units = 'm'
-    conv_fac_spatial_unit = unit_conversion(parser, 'POINT', sys_unit=blend_units)
+    conv_fac_spatial_unit = parser.unit_conversion('POINT', sys_unit=blend_units)
 
     # World orientation adjustment
     scale = global_scale*conv_fac_spatial_unit

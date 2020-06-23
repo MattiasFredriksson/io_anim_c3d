@@ -30,8 +30,10 @@ if DO_PERFMON:
     import time
 
     def new_sampler(init=False):
-        if init:    return ([time.process_time()], [])
-        else:       return ([], [])
+        if init:
+            return ([time.process_time()], [])
+        else:
+            return ([], [])
 
     def begin_sample(sampler):
         sampler[0].append(time.process_time())
