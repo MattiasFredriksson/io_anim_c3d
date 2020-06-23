@@ -376,6 +376,33 @@ class Param(object):
             if len(self.dimensions) < 2:	# Check if data is contained in a single dimension
                 return data.flatten()
             return data
+
+    @property
+    def _as_integer_value(self):
+        ''' Get the param as either 32 bit float or unsigned integer.
+            Evaluates if an integer is stored as a floating point representation.
+        '''
+        if self.total_bytes >= 4:
+            value = self.float_value
+            # Check if float value representation is an integer
+            if int(value) == value:
+                return value
+            return self.uint32_value
+        elif self.total_bytes >= 2:
+            return self.uint16_value
+        else:
+            return self.uint8_value
+
+    @property
+    def float_or_uint_value(self):
+        '''Get the param as either 32 bit float or unsigned integer.'''
+        if self.bytes_per_element == 4:
+            return self.float_value
+        elif self.bytes_per_element == 2:
+            return self.uint16_value
+        else:
+            return self.uint8_value
+
     @property
     def int8_value(self):
         '''Get the param as an 8-bit signed integer.'''
@@ -809,18 +836,32 @@ class Manager(object):
         return self.get('ANALOG:LABELS').string_array
 
     def first_frame(self):
+        # Start frame seems to be less of an issue to determine.
         # this is a hack for phasespace files ... should put it in a subclass.
         param = self.get('TRIAL:ACTUAL_START_FIELD')
         if param is not None:
-            return param.int32_value
+            return param.uint32_value
         return self.header.first_frame
 
     def last_frame(self):
-        # this is a hack for phasespace files ... should put it in a subclass.
+        # Number of frames can be represented in many formats, first check if valid header values
+        if self.header.first_frame < self.header.last_frame and self.header.last_frame != 65535:
+            return self.header.last_frame
+
+        # Check different parameter options where the frame can be encoded
+        end_frame = [self.header.last_frame, 0.0, 0.0, 0.0]
         param = self.get('TRIAL:ACTUAL_END_FIELD')
         if param is not None:
-            return param.int32_value
-        return self.header.last_frame
+            end_frame[1] = param._as_integer_value
+        param = self.get('POINT:LONG_FRAMES')
+        if param is not None:
+            end_frame[2] = param._as_integer_value
+        param = self.get('POINT:FRAMES')
+        if param is not None:
+            # Can be encoded either as 32 bit float or 16 bit uint
+            end_frame[3] = param._as_integer_value
+        # Return the largest of the all (queue bad reading...)
+        return int(np.max(end_frame))
 
 
 class Reader(Manager):

@@ -87,8 +87,9 @@ def load(operator, context, filepath="",
     # Number of frames [first, last] => +1
     # first_frame is the frame index to start parsing from
     # nframes is the number of frames to parse
-    first_frame = parser.reader.header.first_frame
-    nframes = parser.reader.header.last_frame - first_frame + 1
+    first_frame = parser.first_frame
+    nframes = parser.last_frame - first_frame + 1
+    perfmon.message('Parsing: %i frames...' % nframes)
 
     # Create an armature adapted to the data (if specified)
     arm_obj = None
