@@ -1,6 +1,6 @@
 # Pre-Alpha Version
 # io_anim_c3d
-Blender addon for importing .c3d files
+Blender 2.8x addon for importing .c3d files
 
 # How to Install
 1. [Download](https://github.com/MattiasFredriksson/io_anim_c3d/archive/master.zip) the source code.
