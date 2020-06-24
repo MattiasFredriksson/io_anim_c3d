@@ -52,11 +52,6 @@ class DataTypes(object):
             self.int64 = np.int64
 
 
-def MIPS_NP_DTYPE():
-    ''' Big endian floating point representation used by MIPS units. '''
-    dtype = np.dtype(np.float32)
-    dtype.newbyteorder('>')
-    return dtype
 def UNPACK_FLOAT_IEEE(uint_32):
     '''Unpacks a single 32 bit unsigned int to a IEEE float representation
     '''
@@ -65,6 +60,60 @@ def UNPACK_FLOAT_MIPS(uint_32):
     '''Unpacks a single 32 bit unsigned int to a IEEE float representation
     '''
     return struct.unpack('f', struct.pack(">I", uint_32))[0]
+def DEC_to_IEEE_BYTES(bytes):
+    '''Convert byte array containing 32 bit DEC floats to IEEE format.
+
+    Params:
+    ----
+    bytes : Byte array where every 4 bytes represent a single precision DEC float.
+    Returns : IEEE formated floating point of the same shape as the input.
+    '''
+
+    # Follows the bit pattern found:
+    # 	http://home.fnal.gov/~yang/Notes/ieee_vs_dec_float.txt
+    # Further formating descriptions can be found:
+    # 	http://www.irig106.org/docs/106-07/appendixO.pdf
+    # In accodance with the first ref. first & second 16 bit words are placed
+    # in a big endian 16 bit representation, and needs to be inverted.
+    # Second reference describe the DEC->IEEE conversion,
+    # in particular the exponent needs to be subtracted by 1.
+
+    # Warning! Unsure if NaN numbers are managed appropriately.
+
+    # Shuffle the first two bit words from DEC bit representation to an ordered representation.
+    # Note that the most significant fraction bits are placed in the first 7 bits.
+    #
+    # Below are the DEC layout in accordance with the references:
+    # ___________________________________________________________________________________
+    # |		Mantissa (16:0)		|	SIGN	|	Exponent (8:0)	|	Mantissa (23:17)	|
+    # ___________________________________________________________________________________
+    # |32-					  -16|	 15	   |14-				  -7|6-					  -0|
+    #
+    # Legend:
+    # _______________________________________________________
+    # | Part (left bit of segment : right bit) | Part | ..
+    # _______________________________________________________
+    # |Bit adress -     ..       - Bit adress | Bit adress - ..
+    ####
+
+    # Reshuffle
+    bytes = np.frombuffer(bytes, dtype=np.dtype('B'))
+    reshuffled = np.array(bytes).reshape([-1, 4])
+    col_0 = reshuffled[:, 0].copy()
+    col_1 = reshuffled[:, 1].copy()
+    reshuffled[:, 0:2] = reshuffled[:, 2:4]
+    reshuffled[:, 2] = col_0
+
+    # Adjust the final column
+    mask = col_1 != 0
+    col_1[mask] -= 1
+    reshuffled[:, 3] = col_1
+
+    return np.frombuffer(reshuffled.tobytes(),
+                         dtype=np.float32,
+                         count=int(len(bytes) / 4))
+
+                         
 def DEC_to_IEEE(uint_32):
     '''Convert the 32 bit representation of a DEC float to IEEE format.
 
@@ -75,16 +124,14 @@ def DEC_to_IEEE(uint_32):
     Returns : IEEE formated floating point of the same shape as the input.
     '''
 
+
     # Follows the bit pattern found:
     # 	http://home.fnal.gov/~yang/Notes/ieee_vs_dec_float.txt
     # Further formating descriptions can be found:
     # 	http://www.irig106.org/docs/106-07/appendixO.pdf
-    # The difference between the two references is that in the first ref. the first
-    # & second 16 bit words are placed in inverted order which seem correct (either
-    # the bit alignment is wrong in the second reference or there are different DEC
-    # representations)
-    # The implementation follows an implementation from (but with corrected bit pattern):
-    # https://stackoverflow.com/questions/1797806/parsing-a-hex-formated-dec-32-bit-single-precision-floating-point-value-in-pytho
+    # In accodance with the first ref. first & second 16 bit words are placed
+    # in a big endian 16 bit representation, and needs to be inverted.
+    # Second reference describe the DEC->IEEE conversion.
 
     # Warning! Unsure if NaN numbers are managed appropriately.
 
@@ -117,7 +164,6 @@ def DEC_to_IEEE(uint_32):
     # if exponent, mantissa and sign == 0 return 0.0
     result *= uint_32 != 0
     return result
-#end DEC_to_IEEE()
 
 
 class Header(object):
@@ -1111,7 +1157,9 @@ class Reader(Manager):
                 # (the fourth column is still not a float32 representation)
                 if self.processor == PROCESSOR_DEC:
                     # Convert each of the first 6 16-bit words from DEC to IEEE float
-                    points[:,:3] = DEC_to_IEEE(raw[:self.point_used,:3])
+                    points[:,:3] = DEC_to_IEEE_BYTES(raw_bytes).reshape((self.point_used, 4))[:self.point_used,:3]
+                    # Slightly slower:
+                    #points[:,:3] = DEC_to_IEEE(raw[:self.point_used,:3])
                 else:  # If IEEE or MIPS:
                     # Re-read the raw byte representation directly rather then convert the
                     # 3 first columns in the uint32 representation.
