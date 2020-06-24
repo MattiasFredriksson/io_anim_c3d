@@ -113,7 +113,7 @@ def DEC_to_IEEE_BYTES(bytes):
                          dtype=np.float32,
                          count=int(len(bytes) / 4))
 
-                         
+
 def DEC_to_IEEE(uint_32):
     '''Convert the 32 bit representation of a DEC float to IEEE format.
 
