@@ -185,7 +185,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     print_file: BoolProperty(
         name="Print File",
         description="Print file and parameter headers to console",
-        default=False,
+        default=True,
     )
 
     load_mem_efficient: BoolProperty(

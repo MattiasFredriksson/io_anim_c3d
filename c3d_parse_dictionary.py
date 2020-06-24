@@ -294,7 +294,7 @@ class C3DParseDictionary:
         ----
         group_id:   Parameter group id.
         Param_id:   Parameter id.
-        Returns:    Integer value or an array of int values.
+        Returns:    Integer or float value (representing an integer).
         '''
         param = self.getParam(group_id, param_id)
         if(param is None):
@@ -435,16 +435,18 @@ class C3DParseDictionary:
         # Conversion factor (scale)
         conv_fac = 1.0
         # Convert data from unit defined in 'GROUP.UNITS'
-        data_unit = self.parseParamString(group_id, param_id).lower()
+        data_unit = self.parseParamString(group_id, param_id)
         if data_unit is not None:
             if islist(data_unit):
                 # Convert a list of units
                 conv_fac = np.ones(len(data_unit))
                 for i, u in enumerate(data_unit):
+                    u = u.lower()
                     if u in unit_dict:
                         conv_fac = unit_dict[u]
             else:
                 # Convert a single unit string
+                data_unit = data_unit.lower()
                 if data_unit in unit_dict:
                     conv_fac = unit_dict[data_unit]
         else:
@@ -458,7 +460,7 @@ class C3DParseDictionary:
         # Return the conversion factor
         return conv_fac
 
-    def parseLabels(self, group_id, param_ids=['LABELS', 'LABELS2'], make_unique=True):
+    def parseLabels(self, group_id, param_ids=['LABELS', 'LABELS2'], make_unique=True, empty_label_prefix='EMPTY'):
         ''' Get a list of labels from a group.
 
         Params:
@@ -477,24 +479,40 @@ class C3DParseDictionary:
                 labels.append(plabels)
             elif plabels is not None:  # is string
                 labels.append([plabels])
-        labels = np.concatenate(labels)
 
-        # Make labels unique
-        if make_unique:
-            unique_labels, indices, count = np.unique(labels, return_inverse=True, return_counts=True)
-            N = len(indices)
-            counter = np.zeros(N, np.int32)
-            for i in range(N):
-                index = indices[i]
-                if count[index] > 1:
-                    counter[index] += 1
-                    postfix = '_%00i' % counter[index]
-                    if labels[i] == '':
-                        labels[i] = 'EMPTY' + postfix
-                    else:
-                        labels[i] += postfix
+        if len(labels) > 0:
+            labels = np.concatenate(labels)
 
-        return labels
+            # Make labels unique
+            if make_unique:
+                unique_labels, indices, count = np.unique(labels, return_inverse=True, return_counts=True)
+                N = len(indices)
+                counter = np.zeros(N, np.int32)
+                for i in range(N):
+                    index = indices[i]
+                    if count[index] > 1:
+                        counter[index] += 1
+                        label = labels[i] if labels[i] != '' else empty_label_prefix
+                        labels[i] = '%s_%00i' % (label, counter[index])
+
+            return labels
+        else:
+            return np.array([])
+
+    def getPointChannelLabels(self, empty_label_prefix='EMPTY', missing_label_prefix='UNKNOWN'):
+        ''' Determine a set of unique labels for POINT data channels.
+        '''
+        labels = self.parseLabels('POINT', make_unique=True)
+        used_label_count = self.reader.point_used
+        if used_label_count == 0:
+            return labels
+
+        if len(labels) >= used_label_count:
+            return labels[:used_label_count]
+        else:
+            unknown = ['%s_%00i' % (missing_label_prefix, i) for i in range(used_label_count - len(labels))]
+            return np.concatenate((labels, unknown))
+
 
     """
     --------------------------------------------------------
@@ -541,7 +559,7 @@ class C3DParseDictionary:
         ''' Print header info (partial) for the loaded file
         '''
         print("Frames (start,end):\t", self.reader.header.first_frame, self.reader.header.last_frame)
-        print("Channels:\t\t", self.reader.header.point_count)
+        print("POINT Channels:\t\t", self.reader.header.point_count)
         print("Frame rate:\t\t", self.reader.header.frame_rate)
         print("Data Scalar:\t\t", self.reader.header.scale_factor, "  [negative if float representation is used]")
         print("Data format:\t\t", self.reader.proc_type)

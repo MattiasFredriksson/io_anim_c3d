@@ -13,10 +13,58 @@ PROCESSOR_INTEL = 84
 PROCESSOR_DEC = 85
 PROCESSOR_MIPS = 86
 
+
+class DataTypes(object):
+    ''' Define the data types used for reading parameter data.
+    '''
+    def __init__(self, proc_type):
+        if proc_type == PROCESSOR_MIPS:
+            # Big-Endian
+            self.float32 = np.dtype(np.float32)
+            self.float64 = np.dtype(np.float64)
+            self.uint8 = np.uint8
+            self.uint16 = np.dtype(np.uint16)
+            self.uint32 = np.dtype(np.uint32)
+            self.uint64 = np.dtype(np.uint64)
+            self.int8 = np.int8
+            self.int16 = np.dtype(np.int16)
+            self.int32 = np.dtype(np.int32)
+            self.int64 = np.dtype(np.int64)
+            # Define endian
+            self.float32 = self.float32.newbyteorder('>')
+            self.float64 = self.float64.newbyteorder('>')
+            self.uint16 = self.uint16.newbyteorder('>')
+            self.uint32 = self.uint32.newbyteorder('>')
+            self.uint64 = self.uint64.newbyteorder('>')
+            self.int16 = self.int16.newbyteorder('>')
+            self.int32 = self.int32.newbyteorder('>')
+            self.int64 = self.int64.newbyteorder('>')
+        else:
+            self.float32 = np.float32
+            self.float64 = np.float64
+            self.uint8 = np.uint8
+            self.uint16 = np.uint16
+            self.uint32 = np.uint32
+            self.uint64 = np.uint64
+            self.int8 = np.int8
+            self.int16 = np.int16
+            self.int32 = np.int32
+            self.int64 = np.int64
+
+
+def MIPS_NP_DTYPE():
+    ''' Big endian floating point representation used by MIPS units. '''
+    dtype = np.dtype(np.float32)
+    dtype.newbyteorder('>')
+    return dtype
 def UNPACK_FLOAT_IEEE(uint_32):
     '''Unpacks a single 32 bit unsigned int to a IEEE float representation
     '''
     return struct.unpack('f', struct.pack("<I", uint_32))[0]
+def UNPACK_FLOAT_MIPS(uint_32):
+    '''Unpacks a single 32 bit unsigned int to a IEEE float representation
+    '''
+    return struct.unpack('f', struct.pack(">I", uint_32))[0]
 def DEC_to_IEEE(uint_32):
     '''Convert the 32 bit representation of a DEC float to IEEE format.
 
@@ -116,6 +164,7 @@ class Header(object):
     # Read/Write header formats, read values as unsigned ints rather then floats.
     BINARY_FORMAT_WRITE = '<BBHHHHHfHHf270sHH214s'
     BINARY_FORMAT_READ = '<BBHHHHHIHHI270sHH214s'
+    BINARY_FORMAT_READ_BIG_ENDIAN = '>BBHHHHHIHHI270sHH214s'
 
     def __init__(self, handle=None):
         '''Create a new Header object.
@@ -193,7 +242,7 @@ class Header(object):
 long_event_labels: {0.long_event_labels}
       label_block: {0.label_block}'''.format(self)
 
-    def read(self, handle):
+    def read(self, handle, fmt=Header.BINARY_FORMAT_READ):
         '''Read and parse binary header data from a file handle.
 
         This method reads exactly 512 bytes from the beginning of the given file
@@ -226,14 +275,21 @@ long_event_labels: {0.long_event_labels}
          _,
          self.long_event_labels,
          self.label_block,
-         _) = struct.unpack(self.BINARY_FORMAT_READ, handle.read(512))
+         _) = struct.unpack(fmt, handle.read(512))
         assert magic == 80, 'C3D magic {} != 80 !'.format(magic)
 
-    def processor_convert(self, proc):
+    def processor_convert(self, proc, handle):
+        ''' Interprets the header once the processor type has been determined.
+        '''
         if proc == PROCESSOR_DEC:
             self.scale_factor = DEC_to_IEEE(self.scale_factor)
             self.frame_rate = DEC_to_IEEE(self.frame_rate)
         elif proc == PROCESSOR_INTEL:
+            self.scale_factor = UNPACK_FLOAT_IEEE(self.scale_factor)
+            self.frame_rate = UNPACK_FLOAT_IEEE(self.frame_rate)
+        elif proc == PROCESSOR_MIPS:
+            # Reread in big-endian
+            self.read(handle, Header.BINARY_FORMAT_READ_BIG_ENDIAN)
             self.scale_factor = UNPACK_FLOAT_IEEE(self.scale_factor)
             self.frame_rate = UNPACK_FLOAT_IEEE(self.frame_rate)
 
@@ -261,6 +317,7 @@ class Param(object):
 
     def __init__(self,
                  name,
+                 dtype,
                  proc=PROCESSOR_INTEL,
                  desc='',
                  bytes_per_element=1,
@@ -270,6 +327,7 @@ class Param(object):
         '''Set up a new parameter, only the name is required.'''
         self.name = name
         self.proc = proc
+        self.dtype = dtype
         self.desc = desc
         self.bytes_per_element = bytes_per_element
         self.dimensions = dimensions or []
@@ -285,6 +343,9 @@ class Param(object):
     @property
     def isDEC(self):
         return self.proc == PROCESSOR_DEC
+    @property
+    def isMIPS(self):
+        return self.proc == PROCESSOR_MIPS
     @property
     def num_elements(self):
         '''Return the number of elements in this parameter's array value.'''
@@ -350,7 +411,7 @@ class Param(object):
 
     def _as(self, dtype):
         '''Unpack the raw bytes of this param using the given struct format.'''
-        return np.frombuffer(self.bytes, dtype=dtype)[0]
+        return np.frombuffer(self.bytes, count=1, dtype=dtype)[0]
 
     def _as_array(self, dtype):
         '''Unpack the raw bytes of this param using the given data format.'''
@@ -381,12 +442,14 @@ class Param(object):
     def _as_integer_value(self):
         ''' Get the param as either 32 bit float or unsigned integer.
             Evaluates if an integer is stored as a floating point representation.
+
+            Note: This is implemented purely for parsing start/end frames.
         '''
         if self.total_bytes >= 4:
             value = self.float_value
             # Check if float value representation is an integer
             if int(value) == value:
-                return int(value)
+                return value
             return self.uint32_value
         elif self.total_bytes >= 2:
             return self.uint16_value
@@ -394,52 +457,42 @@ class Param(object):
             return self.uint8_value
 
     @property
-    def float_or_uint_value(self):
-        '''Get the param as either 32 bit float or unsigned integer.'''
-        if self.bytes_per_element == 4:
-            return self.float_value
-        elif self.bytes_per_element == 2:
-            return self.uint16_value
-        else:
-            return self.uint8_value
-
-    @property
     def int8_value(self):
         '''Get the param as an 8-bit signed integer.'''
-        return self._as(np.int8)
+        return self._as(self.dtype.int8)
 
     @property
     def uint8_value(self):
         '''Get the param as an 8-bit unsigned integer.'''
-        return self._as(np.uint8)
+        return self._as(self.dtype.uint8)
 
     @property
     def int16_value(self):
         '''Get the param as a 16-bit signed integer.'''
-        return self._as(np.int16)
+        return self._as(self.dtype.int16)
 
     @property
     def uint16_value(self):
         '''Get the param as a 16-bit unsigned integer.'''
-        return self._as(np.uint16)
+        return self._as(self.dtype.uint16)
 
     @property
     def int32_value(self):
         '''Get the param as a 32-bit signed integer.'''
-        return self._as(np.int32)
+        return self._as(self.dtype.int32)
 
     @property
     def uint32_value(self):
         '''Get the param as a 32-bit unsigned integer.'''
-        return self._as(np.uint32)
+        return self._as(self.dtype.uint32)
 
     @property
     def float_value(self):
         '''Get the param as a 32-bit float.'''
         if self.isDEC:
             return DEC_to_IEEE(self._as(np.uint32))
-        else:
-            return self._as(np.float32)
+        else:  # isMIPS or isIEEE
+            return self._as(self.dtype.float32)
 
     @property
     def bytes_value(self):
@@ -454,32 +507,32 @@ class Param(object):
     @property
     def int8_array(self):
         '''Get the param as an array of 8-bit signed integers.'''
-        return self._as_array(np.int8)
+        return self._as_array(self.dtype.int8)
 
     @property
     def uint8_array(self):
         '''Get the param as an array of 8-bit unsigned integers.'''
-        return self._as_array(np.uint8)
+        return self._as_array(self.dtype.uint8)
 
     @property
     def int16_array(self):
         '''Get the param as an array of 16-bit signed integers.'''
-        return self._as_array(np.int16)
+        return self._as_array(self.dtype.int16)
 
     @property
     def uint16_array(self):
         '''Get the param as an array of 16-bit unsigned integers.'''
-        return self._as_array(np.uint16)
+        return self._as_array(self.dtype.uint16)
 
     @property
     def int32_array(self):
         '''Get the param as an array of 32-bit signed integers.'''
-        return self._as_array(np.int32)
+        return self._as_array(self.dtype.int32)
 
     @property
     def uint32_array(self):
         '''Get the param as an array of 32-bit unsigned integers.'''
-        return self._as_array(np.uint32)
+        return self._as_array(self.dtype.uint32)
 
     @property
     def float_array(self):
@@ -487,10 +540,9 @@ class Param(object):
         # Convert float data if not IEEE processor
         if self.isDEC:
             arr = self.uint32_array
-            out = np.zeros(arr.shape)
             out = DEC_to_IEEE(arr)
-        else:
-            out = self._as_array(np.float32)
+        else:  # isIEEe or isMIPS
+            out = self._as_array(self.dtype.float32)
         return out
 
     @property
@@ -549,7 +601,7 @@ class Group(object):
         '''
         return self.params.get(key, default)
 
-    def add_param(self, name, **kwargs):
+    def add_param(self, name, dtypes, **kwargs):
         '''Add a parameter to this group.
 
         Parameters
@@ -557,10 +609,12 @@ class Group(object):
         name : str
             Name of the parameter to add to this group. The name will
             automatically be case-normalized.
+        dtypes : DataTypes
+            Object struct containing the data types used for reading parameter data.
 
         Additional keyword arguments will be passed to the `Param` constructor.
         '''
-        self.params[name.upper()] = Param(name.upper(), **kwargs)
+        self.params[name.upper()] = Param(name.upper(), dtypes, **kwargs)
 
     def binary_size(self):
         '''Return the number of bytes to store this group and its parameters.'''
@@ -685,10 +739,14 @@ class Manager(object):
                 self.header.analog_per_frame,
             ))
 
-        start = self.get_uint16('POINT:DATA_START')
-        if self.header.data_block != start:
-            warnings.warn('inconsistent data block! {} header != {} POINT:DATA_START'.format(
-                self.header.data_block, start))
+        try:
+            start = self.get_uint16('POINT:DATA_START')
+            if self.header.data_block != start:
+                warnings.warn('inconsistent data block! {} header != {} POINT:DATA_START'.format(
+                    self.header.data_block, start))
+        except AttributeError:
+            warnings.warn('''no pointer available in POINT:DATA_START indicating the start of the data block, using
+                             header pointer as fallback''')
 
         for name in ('POINT:LABELS', 'POINT:DESCRIPTIONS',
                      'ANALOG:LABELS', 'ANALOG:DESCRIPTIONS'):
@@ -803,15 +861,24 @@ class Manager(object):
 
     @property
     def point_rate(self):
-        return self.get_float('POINT:RATE')
+        try:
+            return self.get_float('POINT:RATE')
+        except AttributeError:
+            return self.header.frame_rate
 
     @property
     def point_scale(self):
-        return self.get_float('POINT:SCALE')
+        try:
+            return self.get_float('POINT:SCALE')
+        except AttributeError:
+            return self.header.scale_factor
 
     @property
     def point_used(self):
-        return self.get_uint16('POINT:USED')
+        try:
+            return self.get_uint16('POINT:USED')
+        except AttributeError:
+            return self.header.point_count
 
     @property
     def analog_used(self):
@@ -897,19 +964,28 @@ class Reader(Manager):
         super(Reader, self).__init__(Header(handle))
 
         self._handle = handle
-        self._handle.seek((self.header.parameter_block - 1) * 512)
+        def seek_param_section_header():
+            ''' Seek to and read the first 4 byte of the parameter header section '''
+            self._handle.seek((self.header.parameter_block - 1) * 512)
+            # metadata header
+            return self._handle.read(4)
 
-        # metadata header
-        buf = self._handle.read(4)
+        # Begin by reading the processor type:
+        buf = seek_param_section_header()
         _, _, parameter_blocks, self.processor = struct.unpack('BBBB', buf)
-        self.header.processor_convert(self.processor)
-        if self.processor == PROCESSOR_MIPS:
-            raise ValueError(
-                'Only supporting Intel and DEC C3D files (got processor {})'.
-                format(self.processor))
-        # read all parameter blocks as a single chunk to avoid block
-        # boundary issues.
-        #bytes = self._handle.read(512 * parameter_blocks - 4)
+        self.dtypes = DataTypes(self.processor)
+        # Convert header parameters in accordance with the processor type (MIPS format re-reads the header)
+        self.header.processor_convert(self.processor, handle)
+
+        #if self.processor == PROCESSOR_MIPS:
+        #    raise ValueError(
+        #        'Only supporting Intel and DEC C3D files (got processor {})'.
+        #        format(self.processor))
+
+        # Restart reading the parameter header after parsing processor type
+        buf = seek_param_section_header()
+        is_mips = self.processor == PROCESSOR_MIPS
+
         start_byte = self._handle.tell()
         # TODO: replace endbyte = start_byte + 512 * parameter_blocks - 4
         while self._handle.tell() < start_byte + 512 * parameter_blocks - 4:
@@ -917,9 +993,8 @@ class Reader(Manager):
             if group_id == 0 or chars_in_name == 0:
                 # we've reached the end of the parameter section.
                 break
-
             name = self._handle.read(abs(chars_in_name)).decode('utf-8').upper()
-            offset_to_next, = struct.unpack('<h', self._handle.read(2))
+            offset_to_next, = struct.unpack(['<h', '>h'][is_mips], self._handle.read(2))
 
             # Read the byte segment associated with the parameter and create a
             # separate binary stream object from the data
@@ -929,7 +1004,7 @@ class Reader(Manager):
             if group_id > 0:
                 # we've just started reading a parameter. if its group doesn't
                 # exist, create a blank one. add the parameter to the group.
-                self.groups.setdefault(group_id, Group()).add_param(name, handle=buf, proc=self.processor)
+                self.groups.setdefault(group_id, Group()).add_param(name, self.dtypes, handle=buf, proc=self.processor)
             else:
                 # we've just started reading a group. if a group with the
                 # appropriate id exists already (because we've already created
@@ -985,20 +1060,20 @@ class Reader(Manager):
         is_float = self.point_scale < 0
 
         point_word_bytes = [2, 4][is_float]
-        point_dtype = [np.int16, np.uint32][is_float]
+        point_dtype = [self.dtypes.int16, self.dtypes.uint32][is_float]
         points = np.zeros((self.point_used, 5), float)
 
         # TODO: handle ANALOG:BITS parameter here!
         p = self.get('ANALOG:FORMAT')
         analog_unsigned = p and p.string_value.strip().upper() == 'UNSIGNED'
-        analog_dtype = np.int16
+        analog_dtype = self.dtypes.int16
         analog_bytes = 2
-        if is_float:
-            analog_dtype = np.float32
-            analog_bytes = 4
-        elif analog_unsigned:
-            analog_dtype = np.uint16
+        if analog_unsigned:
+            analog_dtype = self.dtypes.uint16
             analog_bytes = 2
+        elif is_float:
+            analog_dtype = self.dtypes.float32
+            analog_bytes = 4
         analog = np.array([], float)
 
         offsets = np.zeros((self.analog_used, 1), int)
@@ -1037,12 +1112,13 @@ class Reader(Manager):
                 if self.processor == PROCESSOR_DEC:
                     # Convert each of the first 6 16-bit words from DEC to IEEE float
                     points[:,:3] = DEC_to_IEEE(raw[:self.point_used,:3])
-                elif self.processor == PROCESSOR_INTEL:
+                else:  # If IEEE or MIPS:
                     # Re-read the raw byte representation directly rather then convert the
                     # 3 first columns in the uint32 representation.
                     points[:,:3] = np.frombuffer(raw_bytes,
-                                                 dtype=np.float32,
+                                                 dtype=self.dtypes.float32,
                                                  count=n_word).reshape((self.point_used, 4))[:self.point_used,:3]
+
 
 
                 # Parse the camera-observed bits and residual.
@@ -1078,7 +1154,7 @@ class Reader(Manager):
                 # Parse last 16-bit word as two 8-bit words
                 valid = raw[:, 3] > -1
                 points[~valid, 3:5] = -1
-                c = raw[valid, 3].astype(np.uint16)
+                c = raw[valid, 3].astype(self.dtypes.uint16)
 
                 # fourth value is floating-point (scaled) error estimate (residual)
                 points[valid, 3] = (c & 0xff).astype(float) * scale_mag
@@ -1240,8 +1316,11 @@ class Writer(Manager):
         if not self._frames:
             return
 
+        dtypes = DataTypes(PROCESSOR_INTEL)
+
         def add(name, desc, bpe, format, bytes, *dimensions):
             group.add_param(name,
+                            dtypes,
                             desc=desc,
                             bytes_per_element=bpe,
                             bytes=struct.pack(format, bytes),
@@ -1249,13 +1328,14 @@ class Writer(Manager):
 
         def add_str(name, desc, bytes, *dimensions):
             group.add_param(name,
+                            dtypes,
                             desc=desc,
                             bytes_per_element=-1,
                             bytes=bytes.encode('utf-8'),
                             dimensions=list(dimensions))
 
         def add_empty_array(name, desc, bpe):
-            group.add_param(name, desc=desc, bytes_per_element=bpe, dimensions=[0])
+            group.add_param(name, dtypes, desc=desc, bytes_per_element=bpe, dimensions=[0])
 
         points, analog = self._frames[0]
         ppf = len(points)

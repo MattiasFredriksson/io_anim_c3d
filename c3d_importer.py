@@ -57,6 +57,8 @@ def load(operator, context, filepath="",
 
     # Open file and read parameter headers
     parser = C3DParseDictionary(filepath)
+    if print_file:
+        parser.printFile()
 
     # Frame rate conversion factor
     conv_fac_frame_rate = 1.0
@@ -78,17 +80,11 @@ def load(operator, context, filepath="",
         global_orient = parser.axis_interpretation([0, 0, 1], [0, 1, 0])
         global_orient *= scale  # Uniform scale axis
 
-    if print_file:
-        parser.printFile()
 
     # Read labels
-    labels = parser.parseLabels('POINT')
-    # Determine used label count
+    labels = parser.getPointChannelLabels()
+    # Equivalent to number of channels defined for POINT data
     nlabels = len(labels)
-    used_label_count = parser.tryParseParam('POINT', 'USED')
-    if nlabels is not None:
-        labels = labels[:used_label_count]
-        nlabels = used_label_count
 
     # Number of frames [first, last] => +1
     # first_frame is the frame index to start parsing from
