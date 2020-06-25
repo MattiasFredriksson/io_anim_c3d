@@ -98,16 +98,13 @@ def DEC_to_IEEE_BYTES(bytes):
 
     # Reshuffle
     bytes = np.frombuffer(bytes, dtype=np.dtype('B'))
-    reshuffled = np.array(bytes).reshape([-1, 4])
-    col_0 = reshuffled[:, 0].copy()
-    col_1 = reshuffled[:, 1].copy()
-    reshuffled[:, 0:2] = reshuffled[:, 2:4]
-    reshuffled[:, 2] = col_0
+    reshuffled = np.empty(len(bytes), dtype=np.dtype('B'))
+    reshuffled[0::4] = bytes[2::4]
+    reshuffled[1::4] = bytes[3::4]
+    reshuffled[2::4] = bytes[0::4]
 
-    # Adjust the final column
-    mask = col_1 != 0
-    col_1[mask] -= 1
-    reshuffled[:, 3] = col_1
+    # Adjust the final column (decrement exponent by 1, if not 0)
+    reshuffled[3::4] = bytes[1::4] + ((bytes[1::4] == 0) - 1)
 
     return np.frombuffer(reshuffled.tobytes(),
                          dtype=np.float32,
@@ -288,7 +285,7 @@ class Header(object):
 long_event_labels: {0.long_event_labels}
       label_block: {0.label_block}'''.format(self)
 
-    def read(self, handle, fmt=Header.BINARY_FORMAT_READ):
+    def read(self, handle, fmt=BINARY_FORMAT_READ):
         '''Read and parse binary header data from a file handle.
 
         This method reads exactly 512 bytes from the beginning of the given file
@@ -300,6 +297,8 @@ long_event_labels: {0.long_event_labels}
             The given handle will be reset to 0 using `seek` and then 512 bytes
             will be read to initialize the attributes in this Header. The handle
             must be readable.
+
+        fmt : Formating string used to read the header.
 
         Raises
         ------

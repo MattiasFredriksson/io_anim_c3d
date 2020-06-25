@@ -183,7 +183,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     )
 
     print_file: BoolProperty(
-        name="Print File",
+        name="Print File Information",
         description="Print file and parameter headers to console",
         default=True,
     )
