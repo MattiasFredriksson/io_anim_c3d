@@ -20,25 +20,16 @@ class DataTypes(object):
     def __init__(self, proc_type):
         if proc_type == PROCESSOR_MIPS:
             # Big-Endian
-            self.float32 = np.dtype(np.float32)
-            self.float64 = np.dtype(np.float64)
+            self.float32 = np.dtype(np.float32).newbyteorder('>')
+            self.float64 = np.dtype(np.float64).newbyteorder('>')
             self.uint8 = np.uint8
-            self.uint16 = np.dtype(np.uint16)
-            self.uint32 = np.dtype(np.uint32)
-            self.uint64 = np.dtype(np.uint64)
+            self.uint16 = np.dtype(np.uint16).newbyteorder('>')
+            self.uint32 = np.dtype(np.uint32).newbyteorder('>')
+            self.uint64 = np.dtype(np.uint64).newbyteorder('>')
             self.int8 = np.int8
-            self.int16 = np.dtype(np.int16)
-            self.int32 = np.dtype(np.int32)
-            self.int64 = np.dtype(np.int64)
-            # Define endian
-            self.float32 = self.float32.newbyteorder('>')
-            self.float64 = self.float64.newbyteorder('>')
-            self.uint16 = self.uint16.newbyteorder('>')
-            self.uint32 = self.uint32.newbyteorder('>')
-            self.uint64 = self.uint64.newbyteorder('>')
-            self.int16 = self.int16.newbyteorder('>')
-            self.int32 = self.int32.newbyteorder('>')
-            self.int64 = self.int64.newbyteorder('>')
+            self.int16 = np.dtype(np.int16).newbyteorder('>')
+            self.int32 = np.dtype(np.int32).newbyteorder('>')
+            self.int64 = np.dtype(np.int64).newbyteorder('>')
         else:
             self.float32 = np.float32
             self.float64 = np.float64
