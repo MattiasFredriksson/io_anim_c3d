@@ -116,8 +116,7 @@ def DEC_to_IEEE(uint_32):
 
     Params:
     ----
-    uint_32 : Numpy array of (or single) 32 bit unsigned integer(s) containing
-        the DEC single precision float point bits.
+    uint_32 : 32 bit unsigned integer containing the DEC single precision float point bits.
     Returns : IEEE formated floating point of the same shape as the input.
     '''
 
@@ -127,7 +126,7 @@ def DEC_to_IEEE(uint_32):
     # Further formating descriptions can be found:
     # 	http://www.irig106.org/docs/106-07/appendixO.pdf
     # In accodance with the first ref. first & second 16 bit words are placed
-    # in a big endian 16 bit representation, and needs to be inverted.
+    # in a big endian 16 bit word representation, and needs to be inverted.
     # Second reference describe the DEC->IEEE conversion.
 
     # Warning! Unsure if NaN numbers are managed appropriately.
@@ -151,16 +150,9 @@ def DEC_to_IEEE(uint_32):
     # Swap the first and last 16  bits for a consistent alignment of the fraction
     reshuffled = ((uint_32 & 0xFFFF0000) >> 16) | ((uint_32 & 0x0000FFFF) << 16)
     # After the shuffle each part are in little-endian and ordered as: SIGN-Exponent-Fraction
-    signbit = (reshuffled & 0x80000000) >> 31
-    exp_bits = (reshuffled & 0x7F800000) >> 23
-    # Evaluate as floating point (ensures there are no undef. behaviors or nasty conversions).
-    exponent = np.float32(exp_bits) - 128
-    fraction = np.float32((reshuffled & 0x007FFFFF) | 0x00800000) / 16777216.0 	# 0.1F = (F | 2^23) / 2^24
-    sign = 1.0-2.0*np.float32(signbit)
-    result = sign * fraction * np.power(2.0, exponent) 			                # SIGN * 0.1F * 2^(E-128)
-    # if exponent, mantissa and sign == 0 return 0.0
-    result *= uint_32 != 0
-    return result
+    exp_bits = ((reshuffled & 0xFF000000) - 1) & 0xFF000000
+    reshuffled = (reshuffled & 0x00FFFFFF) | exp_bits
+    return UNPACK_FLOAT_IEEE(reshuffled)
 
 
 class Header(object):
@@ -584,11 +576,12 @@ class Param(object):
         '''Get the param as an array of 32-bit floats.'''
         # Convert float data if not IEEE processor
         if self.isDEC:
-            arr = self.uint32_array
-            out = DEC_to_IEEE(arr)
+            # _as_array but for DEC
+            assert self.dimensions, \
+                '{}: cannot get value as {} array!'.format(self.name, dtype)
+            return DEC_to_IEEE_BYTES(self.bytes).reshape(self.dimensions[::-1])  # Reverse fortran format
         else:  # isIEEe or isMIPS
-            out = self._as_array(self.dtype.float32)
-        return out
+            return self._as_array(self.dtype.float32)
 
     @property
     def bytes_array(self):
