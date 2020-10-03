@@ -78,19 +78,6 @@ def parseC3DArray(param, dtype=np.int8):
     param:	c3d.Param object
     '''
     return param._as_any(dtype)
-    if 0 in param.dimensions[:]: 	# Check if any dimension is 0 (empty buffer)
-        return [] 					# Buffer is empty
-    # parseCount = int(nbytes(param) / param.bytes_per_element)
-    if issingle(param):			# Check if single data item (not array)
-        return param._as(dtype)
-    if dtype == np.float32:
-        data = param.float_array()
-    else:
-        data = param._as_array(dtype)
-    if isvector(param):				# Check if data is contained in a single dimension
-        return data.flatten()
-    return data
-
 
 def parseC3DString(param, dtype=np.int8):
     ''' Parse data as an array of, or single string.
@@ -104,9 +91,7 @@ def parseC3DString(param, dtype=np.int8):
     if isvector(param):  # Attribute is a single string vector
         return data.tostring().decode("ascii").strip()
     else:  # Attribute is composed of an array of strings (or ndim?)
-        list = []
-        for word in data:
-            list.append(word.tostring().decode("ascii").strip())
+        list = [word.tostring().decode("ascii").strip() for word in data]
         return np.array(list)
 
 
@@ -129,6 +114,7 @@ class C3DParseDictionary:
             self.readFile(filePath)
 
     def __del__(self):
+        # Destructor
         self.close()
 
     def readFile(self, file_path):
@@ -153,7 +139,7 @@ class C3DParseDictionary:
         '''
         group = self.getGroup(group_id) 	# Fetch group
         if group is None:					# Verify fetch
-            return None
+            return None                     # Return None if group does not exist
         return group.get(param_id, None)    # Fetch param or return None if not found
 
     def getParamNames(self, group_id):
@@ -274,7 +260,7 @@ class C3DParseDictionary:
         param = self.getParam(group_id, param_id)
         if(param is None):
             return None
-        if(param.bytes_per_element == -1):  # String data
+        if(param.bytes_per_element == -1):  # Byte representation indicate string data
             return self.parseParamString(group_id, param_id)
         elif(param.bytes_per_element == 1):
             return parseC3DArray(param, dtype=np.uint8)
@@ -419,7 +405,7 @@ class C3DParseDictionary:
             'm':            1.0,
             'meter':        1.0,
             'cm':           1e-2,
-            'centimeter':   1e-3,
+            'centimeter':   1e-2,
             'mm':           1e-3,
             'millimeter':   1e-3,
             # Imperial
@@ -474,11 +460,11 @@ class C3DParseDictionary:
 
         labels = []
         for pid in param_ids:
-            plabels = self.parseParamString(group_id, pid)
-            if islist(plabels):
-                labels.append(plabels)
-            elif plabels is not None:  # is string
-                labels.append([plabels])
+            glabels = self.parseParamString(group_id, pid)
+            if islist(glabels):
+                labels.append(glabels)
+            elif glabels is not None:  # is string
+                labels.append([glabels])
 
         if len(labels) > 0:
             labels = np.concatenate(labels)
