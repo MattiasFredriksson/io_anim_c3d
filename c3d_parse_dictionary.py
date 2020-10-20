@@ -324,12 +324,12 @@ class C3DParseDictionary:
     @property
     def first_frame(self):
         ''' Get index of the first recorded frame. '''
-        return self.reader.first_frame()
+        return self.reader.first_frame
 
     @property
     def last_frame(self):
         ''' Get index of the last recorded frame. '''
-        return self.reader.last_frame()
+        return self.reader.last_frame
 
     @property
     def frame_rate(self):

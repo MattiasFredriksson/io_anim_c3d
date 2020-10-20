@@ -42,6 +42,19 @@ class DataTypes(object):
             self.int32 = np.int32
             self.int64 = np.int64
 
+    def decode_string(self, bytes):
+        ''' Decode a byte array to a string.
+        '''
+        # Attempt to decode using different decoders
+        decoders =  ['utf-8', 'latin-1']
+        for dec in decoders:
+            try:
+                return bytes.decode(dec)
+            except UnicodeDecodeError:
+                continue
+        # Revert to using default decoder but replace characters
+        return bytes.decode(decoders[0], 'replace')
+
 
 def UNPACK_FLOAT_IEEE(uint_32):
     '''Unpacks a single 32 bit unsigned int to a IEEE float representation
@@ -51,55 +64,6 @@ def UNPACK_FLOAT_MIPS(uint_32):
     '''Unpacks a single 32 bit unsigned int to a IEEE float representation
     '''
     return struct.unpack('f', struct.pack(">I", uint_32))[0]
-def DEC_to_IEEE_BYTES(bytes):
-    '''Convert byte array containing 32 bit DEC floats to IEEE format.
-
-    Params:
-    ----
-    bytes : Byte array where every 4 bytes represent a single precision DEC float.
-    Returns : IEEE formated floating point of the same shape as the input.
-    '''
-
-    # Follows the bit pattern found:
-    # 	http://home.fnal.gov/~yang/Notes/ieee_vs_dec_float.txt
-    # Further formating descriptions can be found:
-    # 	http://www.irig106.org/docs/106-07/appendixO.pdf
-    # In accodance with the first ref. first & second 16 bit words are placed
-    # in a big endian 16 bit representation, and needs to be inverted.
-    # Second reference describe the DEC->IEEE conversion,
-    # in particular the exponent needs to be subtracted by 1.
-
-    # Warning! Unsure if NaN numbers are managed appropriately.
-
-    # Shuffle the first two bit words from DEC bit representation to an ordered representation.
-    # Note that the most significant fraction bits are placed in the first 7 bits.
-    #
-    # Below are the DEC layout in accordance with the references:
-    # ___________________________________________________________________________________
-    # |		Mantissa (16:0)		|	SIGN	|	Exponent (8:0)	|	Mantissa (23:17)	|
-    # ___________________________________________________________________________________
-    # |32-					  -16|	 15	   |14-				  -7|6-					  -0|
-    #
-    # Legend:
-    # _______________________________________________________
-    # | Part (left bit of segment : right bit) | Part | ..
-    # _______________________________________________________
-    # |Bit adress -     ..       - Bit adress | Bit adress - ..
-    ####
-
-    # Reshuffle
-    bytes = np.frombuffer(bytes, dtype=np.dtype('B'))
-    reshuffled = np.empty(len(bytes), dtype=np.dtype('B'))
-    reshuffled[0::4] = bytes[2::4]
-    reshuffled[1::4] = bytes[3::4]
-    reshuffled[2::4] = bytes[0::4]
-
-    # Adjust the final column (decrement exponent by 1, if not 0)
-    reshuffled[3::4] = bytes[1::4] + ((bytes[1::4] == 0) - 1)
-
-    return np.frombuffer(reshuffled.tobytes(),
-                         dtype=np.float32,
-                         count=int(len(bytes) / 4))
 
 
 def DEC_to_IEEE(uint_32):
@@ -144,6 +108,138 @@ def DEC_to_IEEE(uint_32):
     exp_bits = ((reshuffled & 0xFF000000) - 1) & 0xFF000000
     reshuffled = (reshuffled & 0x00FFFFFF) | exp_bits
     return UNPACK_FLOAT_IEEE(reshuffled)
+def DEC_to_IEEE_BYTES(bytes):
+    '''Convert byte array containing 32 bit DEC floats to IEEE format.
+
+    Params:
+    ----
+    bytes : Byte array where every 4 bytes represent a single precision DEC float.
+    Returns : IEEE formated floating point of the same shape as the input.
+    '''
+
+    ##
+    # Follows the bit pattern found:
+    # 	1) http://home.fnal.gov/~yang/Notes/ieee_vs_dec_float.txt
+    # Further formating descriptions can be found:
+    # 	2) http://www.irig106.org/docs/106-07/appendixO.pdf
+    #   3) http://home.kpn.nl/jhm.bonten/computers/bitsandbytes/wordsizes/hidbit.htm
+    # The current implementation is similar to the one used for Vicon systems:
+    #   4) http://www.clinicalgaitanalysis.com/faq/c3d.html#Appendix
+    #
+    # In accodance with the first ref. first & second 16 bit words are placed
+    # in a big endian 16 bit representation, and needs to be inverted.
+    # Second reference describe the DEC->IEEE conversion,
+    # in particular the exponent needs to be subtracted by 2
+    # (equivalent to dividing by 4).
+    #
+    # Warning! DEC undefined (similar to inf/NaN but not quite) numbers are not managed appropriately (3).
+
+    ##
+    # Shuffle the first two bit words from DEC bit representation to an ordered representation.
+    # Note that the most significant fraction bits are placed in the first 7 bits.
+    #
+    # Below are the DEC layout in accordance with the references:
+    # ___________________________________________________________________________________
+    # |		Mantissa (16:0)		|	SIGN	|	Exponent (8:0)	|	Mantissa (23:17)	|
+    # ___________________________________________________________________________________
+    # |32-					  -16|	 15	   |14-				  -7|6-					  -0|
+    #
+    # Legend:
+    # _______________________________________________________
+    # | Part (left bit of segment : right bit) | Part | ..
+    # _______________________________________________________
+    # |Bit adress -     ..       - Bit adress | Bit adress - ..
+    ####
+
+    # Reshuffle
+    bytes = np.frombuffer(bytes, dtype=np.dtype('B'))
+    reshuffled = np.empty(len(bytes), dtype=np.dtype('B'))
+    reshuffled[0::4] = bytes[2::4]
+    reshuffled[1::4] = bytes[3::4]
+    reshuffled[2::4] = bytes[0::4]
+    reshuffled[3::4] = bytes[1::4] + ((bytes[1::4] & 0x7f == 0) - 1) # Decrement exponent by 2, if exp. > 1
+
+
+    # There are different ways to adjust for differences in DEC/IEEE representation
+    # after reshuffle. Two simple methods are:
+    # 1) Decrement exponent bits by 2, then convert to IEEE.
+    # 2) Convert to IEEE directly and divide by four.
+    # 3) Handle edge cases, expensive in python...
+    # However these are simple methods, and do not accurately convert when:
+    # 1) Exponent < 2 (without bias), impossible to decrement exponent without adjusting fraction/mantissa.
+    # 2) Exponent == 0, DEC numbers are then 0 or undefined while IEEE is not. NaN are produced when exponent == 255.
+    # Here method 1) is used, which mean that only small numbers will be represented incorrectly.
+
+    return np.frombuffer(reshuffled.tobytes(),
+                                 dtype=np.float32,
+                                 count=int(len(bytes) / 4))
+
+def DEC_to_IEEE_REFERENCE(bytes):
+    '''Convert the 32 bit representation of a DEC float to IEEE format.
+
+    Params:
+    ----
+    bytes : Byte array where every 4 bytes represent a single precision DEC float.
+    Returns : IEEE formated floating point of the same shape as the input.
+    '''
+    ##
+    # Follows the bit pattern found:
+    # 	1) http://home.fnal.gov/~yang/Notes/ieee_vs_dec_float.txt
+    # Further formating descriptions can be found:
+    # 	2) http://www.irig106.org/docs/106-07/appendixO.pdf
+    #   3) http://home.kpn.nl/jhm.bonten/computers/bitsandbytes/wordsizes/hidbit.htm
+    # The current implementation is similar to the one used for Vicon systems:
+    #   4) http://www.clinicalgaitanalysis.com/faq/c3d.html#Appendix
+    #
+    # In accodance with the first ref. first & second 16 bit words are placed
+    # in a big endian 16 bit representation, and needs to be inverted.
+    # Second reference describe the DEC->IEEE conversion,
+    # in particular the exponent needs to be subtracted by 2
+    # (equivalent to dividing by 4).
+    #
+    # Warning! DEC undefined (similar to inf/NaN but not quite) numbers are not managed appropriately (3).
+
+    ##
+    # Shuffle the first two bit words from DEC bit representation to an ordered representation.
+    # Note that the most significant fraction bits are placed in the first 7 bits.
+    #
+    # Below are the DEC layout in accordance with the references:
+    # ___________________________________________________________________________________
+    # |		Mantissa (16:0)		|	SIGN	|	Exponent (8:0)	|	Mantissa (23:17)	|
+    # ___________________________________________________________________________________
+    # |32-					  -16|	 15	   |14-				  -7|6-					  -0|
+    #
+    # Legend:
+    # _______________________________________________________
+    # | Part (left bit of segment : right bit) | Part | ..
+    # _______________________________________________________
+    # |Bit adress -     ..       - Bit adress | Bit adress - ..
+    ####
+    # Eq. bit expressions used below:
+    # E: Exponent
+    # F: Fraction (mantissa)
+    # S: Sign
+
+    uint_32 = np.frombuffer(bytes, dtype=np.uint32, count=int(len(bytes) / 4))
+
+    # Swap the first and last 16  bits for a consistent alignment of the fraction
+    reshuffled = ((uint_32 & 0xFFFF0000) >> 16) | ((uint_32 & 0x0000FFFF) << 16)
+    # After the shuffle each part are in little-endian and ordered as: SIGN-Exponent-Fraction
+    signbit = (reshuffled & 0x80000000) >> 31
+    exp_bits = (reshuffled & 0x7F800000) >> 23
+    # Evaluate as floating point (ensures there are no undef. behaviors or nasty conversions).
+    exponent = np.float32(exp_bits) - 128                                       # E - 2^7
+    fraction = np.float32((reshuffled & 0x007FFFFF) | 0x00800000) / 0x1000000 	# 0.1F = (F | 2^23) / 2^24
+    sign = np.float32((-1.0)**signbit)                                          # -1^S
+    result = sign * fraction * 2 ** exponent         			                # -1^S * 0.1F * 2^(E-2^7)
+    # if exponent == 0 return 0.0
+    result *= exp_bits != 0
+    # if reshuffled & 0xFF800000 == 0x80000000, then the value is 'undefined' in DEC.
+    # Essentially, if E == 0 and S == 1 then the value is undefined.
+    # Since undefined values are undefined, 0 is returned, even if not NaN would be optimal.
+
+    return result
+#end DEC_to_IEEE_REFERENCE()
 
 
 class Header(object):
@@ -151,7 +247,7 @@ class Header(object):
 
     Attributes
     ----------
-    label_block : int
+    event_block : int
         Index of the 512-byte block where labels (metadata) are found.
     parameter_block : int
         Index of the 512-byte block where parameters (metadata) are found.
@@ -188,9 +284,9 @@ class Header(object):
     '''
 
     # Read/Write header formats, read values as unsigned ints rather then floats.
-    BINARY_FORMAT_WRITE = '<BBHHHHHfHHf270sHH214s'
-    BINARY_FORMAT_READ = '<BBHHHHHIHHI270sHH214s'
-    BINARY_FORMAT_READ_BIG_ENDIAN = '>BBHHHHHIHHI270sHH214s'
+    BINARY_FORMAT_WRITE =           '<BBHHHHHfHHf274sHHH164s44s'
+    BINARY_FORMAT_READ =            '<BBHHHHHIHHI274sHHH164s44s'
+    BINARY_FORMAT_READ_BIG_ENDIAN = '>BBHHHHHIHHI274sHHH164s44s'
 
     def __init__(self, handle=None):
         '''Create a new Header object.
@@ -202,7 +298,6 @@ class Header(object):
             handle. The handle must be seek-able and readable. If `handle` is
             not given, Header attributes are initialized with default values.
         '''
-        self.label_block = 0
         self.parameter_block = 2
         self.data_block = 3
 
@@ -217,6 +312,12 @@ class Header(object):
         self.max_gap = 0
         self.scale_factor = -1.0
         self.long_event_labels = False
+        self.event_count = 0
+
+        self.event_block = b''
+        self.event_timings = np.zeros(0, dtype=np.float32)
+        self.event_disp_flags = np.zeros(0, dtype=np.bool)
+        self.event_labels = []
 
         if handle:
             self.read(handle)
@@ -236,6 +337,7 @@ class Header(object):
         '''
         handle.seek(0)
         handle.write(struct.pack(self.BINARY_FORMAT_WRITE,
+                                 # Pack vars:
                                  self.parameter_block,
                                  0x50,
                                  self.point_count,
@@ -248,8 +350,10 @@ class Header(object):
                                  self.analog_per_frame,
                                  self.frame_rate,
                                  b'',
-                                 self.long_event_labels and 0x3039 or 0x0,
-                                 self.label_block,
+                                 self.long_event_labels and 0x3039 or 0x0, # If True write long_event_key else 0
+                                 self.event_count,
+                                 0x0,
+                                 self.event_block,
                                  b''))
 
     def __str__(self):
@@ -266,7 +370,7 @@ class Header(object):
  analog_per_frame: {0.analog_per_frame}
        frame_rate: {0.frame_rate}
 long_event_labels: {0.long_event_labels}
-      label_block: {0.label_block}'''.format(self)
+      event_block: {0.event_block}'''.format(self)
 
     def read(self, handle, fmt=BINARY_FORMAT_READ):
         '''Read and parse binary header data from a file handle.
@@ -289,6 +393,8 @@ long_event_labels: {0.long_event_labels}
             If the magic byte from the header is not 80 (the C3D magic value).
         '''
         handle.seek(0)
+        raw = handle.read(512)
+
         (self.parameter_block,
          magic,
          self.point_count,
@@ -302,24 +408,66 @@ long_event_labels: {0.long_event_labels}
          self.frame_rate,
          _,
          self.long_event_labels,
-         self.label_block,
-         _) = struct.unpack(fmt, handle.read(512))
+         self.event_count,
+         __,
+         self.event_block,
+         _) = struct.unpack(fmt, raw)
+
+        # Check magic number if reading in little endian
         assert magic == 80, 'C3D magic {} != 80 !'.format(magic)
 
+        # Check long event key
+        self.long_event_labels = self.long_event_labels == 0x3039
+
+
     def processor_convert(self, proc, handle):
-        ''' Interprets the header once the processor type has been determined.
+        ''' Function interpreting the header once processor type has been determined.
         '''
+
         if proc == PROCESSOR_DEC:
             self.scale_factor = DEC_to_IEEE(self.scale_factor)
             self.frame_rate = DEC_to_IEEE(self.frame_rate)
+            float_unpack = DEC_to_IEEE
         elif proc == PROCESSOR_INTEL:
             self.scale_factor = UNPACK_FLOAT_IEEE(self.scale_factor)
             self.frame_rate = UNPACK_FLOAT_IEEE(self.frame_rate)
+            float_unpack = UNPACK_FLOAT_IEEE
         elif proc == PROCESSOR_MIPS:
-            # Reread in big-endian
+            # Re-read header in big-endian
             self.read(handle, Header.BINARY_FORMAT_READ_BIG_ENDIAN)
+            # Then unpack
             self.scale_factor = UNPACK_FLOAT_IEEE(self.scale_factor)
             self.frame_rate = UNPACK_FLOAT_IEEE(self.frame_rate)
+            float_unpack = UNPACK_FLOAT_IEEE
+
+        self.interpret_events(proc, float_unpack)
+
+
+    def interpret_events(self, proc, float_unpack):
+        ''' Function interpreting the event section of the header.
+        '''
+
+        # Event section byte blocks
+        time_bytes = self.event_block[:72]
+        disp_bytes = self.event_block[72:90]
+        label_bytes = self.event_block[92:]
+
+        if proc == PROCESSOR_MIPS:
+            unpack_fmt = '>I'
+        else:
+            unpack_fmt = '<I'
+
+        read_count = self.event_count
+        self.event_timings = np.zeros(read_count, dtype=np.float32)
+        self.event_disp_flags = np.zeros(read_count, dtype=np.bool)
+        self.event_labels = [''] * read_count
+        for i in range(read_count):
+            ilong = i*4
+            # Unpack
+            self.event_disp_flags[i] = disp_bytes[i] > 0
+            self.event_timings[i] = float_unpack(struct.unpack(unpack_fmt, time_bytes[ilong:ilong+4])[0])
+            self.event_labels[i] = str(label_bytes[ilong:ilong+4])
+
 
 
 class Param(object):
@@ -390,14 +538,15 @@ class Param(object):
     def binary_size(self):
         '''Return the number of bytes needed to store this parameter.'''
         return (
-            1 + # group_id
-            2 + # next offset marker
-            1 + len(self.name.encode('utf-8')) + # size of name and name bytes
-            1 + # data size
-            1 + len(self.dimensions) + # size of dimensions and dimension bytes
-            self.total_bytes + # data
-            1 + len(self.desc.encode('utf-8')) # size of desc and desc bytes
-            )
+            1 +  # group_id
+            2 +  # next offset marker
+            1 + len(self.name.encode('utf-8')) +  # size of name and name bytes
+            1 +  # data size
+            # size of dimensions and dimension bytes
+            1 + len(self.dimensions) +
+            self.total_bytes +  # data
+            1 + len(self.desc.encode('utf-8'))  # size of desc and desc bytes
+        )
 
     def write(self, group_id, handle):
         '''Write binary data for this parameter to a file handle.
@@ -430,12 +579,13 @@ class Param(object):
         '''
         self.bytes_per_element, = struct.unpack('b', handle.read(1))
         dims, = struct.unpack('B', handle.read(1))
-        self.dimensions = [struct.unpack('B', handle.read(1))[0] for _ in range(dims)]
+        self.dimensions = [struct.unpack('B', handle.read(1))[
+            0] for _ in range(dims)]
         self.bytes = b''
         if self.total_bytes:
             self.bytes = handle.read(self.total_bytes)
         desc_size, = struct.unpack('B', handle.read(1))
-        self.desc = desc_size and handle.read(desc_size).decode('utf-8') or ''
+        self.desc = desc_size and self.dtype.decode_string(handle.read(desc_size)) or ''
 
     def _as(self, dtype):
         '''Unpack the raw bytes of this param using the given struct format.'''
@@ -474,8 +624,8 @@ class Param(object):
             Note: This is implemented purely for parsing start/end frames.
         '''
         if self.total_bytes >= 4:
-            value = self.float_value
             # Check if float value representation is an integer
+            value = self.float_value
             if int(value) == value:
                 return value
             return self.uint32_value
@@ -530,7 +680,7 @@ class Param(object):
     @property
     def string_value(self):
         '''Get the param as a unicode string.'''
-        return self.bytes.decode('utf-8')
+        return self.dtype.decode_string(self.bytes)
 
     @property
     def int8_array(self):
@@ -585,10 +735,20 @@ class Param(object):
     @property
     def string_array(self):
         '''Get the param as a array of unicode strings.'''
-        assert len(self.dimensions) == 2, \
-            '{}: cannot get value as string array!'.format(self.name)
-        l, n = self.dimensions
-        return [self.bytes[i*l:(i+1)*l].decode('utf-8') for i in range(n)]
+        def recurse_read(dims, off=0):
+            if len(dims) == 1:
+                return self.dtype.decode_string(self.bytes[off:off+dims[0]])
+            else:
+                # Recurse until a single array of strings can be parsed.
+                return [recurse_read(dims[:-1], off=i*np.prod(dims[:-1])) for i in range(dims[-1])]
+
+        # Decode different dimensions
+        if len(self.dimensions) == 0:
+            return []
+        elif len(self.dimensions) == 1:
+            return [self.string_value]
+        else:
+            return recurse_read(self.dimensions)
 
 
 class Group(object):
@@ -648,10 +808,10 @@ class Group(object):
     def binary_size(self):
         '''Return the number of bytes to store this group and its parameters.'''
         return (
-            1 + # group_id
-            1 + len(self.name.encode('utf-8')) + # size of name and name bytes
-            2 + # next offset marker
-            1 + len(self.desc.encode('utf-8')) + # size of desc and desc bytes
+            1 +  # group_id
+            1 + len(self.name.encode('utf-8')) +  # size of name and name bytes
+            2 +  # next offset marker
+            1 + len(self.desc.encode('utf-8')) +  # size of desc and desc bytes
             sum(p.binary_size() for p in self.params.values()))
 
     def write(self, group_id, handle):
@@ -777,10 +937,19 @@ class Manager(object):
             warnings.warn('''no pointer available in POINT:DATA_START indicating the start of the data block, using
                              header pointer as fallback''')
 
-        for name in ('POINT:LABELS', 'POINT:DESCRIPTIONS',
-                     'ANALOG:LABELS', 'ANALOG:DESCRIPTIONS'):
-            if self.get(name) is None:
-                warnings.warn('missing parameter {}'.format(name))
+        def check_parameters(params):
+            for name in params:
+                if self.get(name) is None:
+                    warnings.warn('missing parameter {}'.format(name))
+
+        if self.point_used > 0:
+            check_parameters(('POINT:LABELS', 'POINT:DESCRIPTIONS'))
+        else:
+            warnings.warn('No point data found in file.')
+        if self.analog_used > 0:
+            check_parameters(('ANALOG:LABELS', 'ANALOG:DESCRIPTIONS'))
+        else:
+            warnings.warn('No analog data found in file.')
 
     def add_group(self, group_id, name, desc):
         '''Add a new parameter group.
@@ -890,6 +1059,8 @@ class Manager(object):
 
     @property
     def point_rate(self):
+        ''' Number of sampled 3D coordinates per second.
+        '''
         try:
             return self.get_float('POINT:RATE')
         except AttributeError:
@@ -904,6 +1075,8 @@ class Manager(object):
 
     @property
     def point_used(self):
+        ''' Number of sampled 3D point coordinates per frame.
+        '''
         try:
             return self.get_uint16('POINT:USED')
         except AttributeError:
@@ -911,17 +1084,33 @@ class Manager(object):
 
     @property
     def analog_used(self):
+        ''' Number of analog measurements, or channels, for each analog data sample.
+        '''
         try:
             return self.get_uint16('ANALOG:USED')
         except AttributeError:
-            return 0
+            return self.header.analog_count
 
     @property
     def analog_rate(self):
+        '''  Total number of analog data samples per 3D frame (point sample).
+        '''
         try:
             return self.get_float('ANALOG:RATE')
         except AttributeError:
             return 0
+
+    @property
+    def analog_per_frame(self):
+        '''  Number of analog samples per 3D frame (point sample).
+        '''
+        return int(self.analog_rate / self.point_rate)
+
+    @property
+    def analog_sample_count(self):
+        ''' Number of analog samples per channel.
+        '''
+        return int(self.frame_count * self.analog_rate)
 
     @property
     def point_labels(self):
@@ -931,6 +1120,11 @@ class Manager(object):
     def analog_labels(self):
         return self.get('ANALOG:LABELS').string_array
 
+    @property
+    def frame_count(self):
+        return self.last_frame - self.first_frame + 1 # Add 1 since range is inclusive [first, last]
+
+    @property
     def first_frame(self):
         # Start frame seems to be less of an issue to determine.
         # this is a hack for phasespace files ... should put it in a subclass.
@@ -939,6 +1133,7 @@ class Manager(object):
             return param.uint32_value
         return self.header.first_frame
 
+    @property
     def last_frame(self):
         # Number of frames can be represented in many formats, first check if valid header values
         if self.header.first_frame < self.header.last_frame and self.header.last_frame != 65535:
@@ -1016,24 +1211,30 @@ class Reader(Manager):
         is_mips = self.processor == PROCESSOR_MIPS
 
         start_byte = self._handle.tell()
-        # TODO: replace endbyte = start_byte + 512 * parameter_blocks - 4
-        while self._handle.tell() < start_byte + 512 * parameter_blocks - 4:
+        endbyte = start_byte + 512 * parameter_blocks - 4
+        while self._handle.tell() < endbyte:
             chars_in_name, group_id = struct.unpack('bb', self._handle.read(2))
             if group_id == 0 or chars_in_name == 0:
                 # we've reached the end of the parameter section.
                 break
-            name = self._handle.read(abs(chars_in_name)).decode('utf-8').upper()
-            offset_to_next, = struct.unpack(['<h', '>h'][is_mips], self._handle.read(2))
+            name = self.dtypes.decode_string(self._handle.read(abs(chars_in_name))).upper()
 
             # Read the byte segment associated with the parameter and create a
-            # separate binary stream object from the data
-            bytes = self._handle.read(offset_to_next-2)
+            # separate binary stream object from the data.
+            offset_to_next, = struct.unpack(['<h', '>h'][is_mips], self._handle.read(2))
+            if offset_to_next == 0:
+                # Last parameter, as number of bytes are unknown,
+                # read the remaining bytes in the parameter section.
+                bytes = self._handle.read(endbyte - self._handle.tell())
+            else:
+                bytes = self._handle.read(offset_to_next - 2)
             buf = io.BytesIO(bytes)
 
             if group_id > 0:
                 # we've just started reading a parameter. if its group doesn't
                 # exist, create a blank one. add the parameter to the group.
-                self.groups.setdefault(group_id, Group()).add_param(name, self.dtypes, handle=buf, proc=self.processor)
+                self.groups.setdefault(
+                    group_id, Group()).add_param(name, self.dtypes, handle=buf, proc=self.processor)
             else:
                 # we've just started reading a group. if a group with the
                 # appropriate id exists already (because we've already created
@@ -1088,23 +1289,33 @@ class Reader(Manager):
         scale_mag = abs(self.point_scale)
         is_float = self.point_scale < 0
 
-        point_word_bytes = [2, 4][is_float]
-        point_dtype = [self.dtypes.int16, self.dtypes.uint32][is_float]
-        points = np.zeros((self.point_used, 5), float)
+        if is_float:
+            point_word_bytes = 4
+            point_dtype = self.dtypes.uint32
+        else:
+            point_word_bytes = 2
+            point_dtype = self.dtypes.int16
+        points = np.zeros((self.point_used, 5), np.float32)
 
         # TODO: handle ANALOG:BITS parameter here!
         p = self.get('ANALOG:FORMAT')
         analog_unsigned = p and p.string_value.strip().upper() == 'UNSIGNED'
-        analog_dtype = self.dtypes.int16
-        analog_bytes = 2
-        if analog_unsigned:
-            analog_dtype = self.dtypes.uint16
-            analog_bytes = 2
-        elif is_float:
+        if is_float:
             analog_dtype = self.dtypes.float32
-            analog_bytes = 4
-        analog = np.array([], float)
+            analog_word_bytes = 4
+        elif analog_unsigned:
+            # Note*: Floating point is 'always' defined for both analog and point data, according to the standard.
+            analog_dtype = self.dtypes.uint16
+            analog_word_bytes = 2
+            # Verify BITS parameter for analog
+            p = self.get('ANALOG:BITS')
+            if p and p._as_integer_value / 8 != analog_word_bytes:
+                    raise NotImplementedError('Analog data using {} bits is not supported.'.format(p._as_integer_value))
+        else:
+            analog_dtype = self.dtypes.int16
+            analog_word_bytes = 2
 
+        analog = np.array([], float)
         offsets = np.zeros((self.analog_used, 1), int)
         param = self.get('ANALOG:OFFSET')
         if param is not None:
@@ -1122,63 +1333,61 @@ class Reader(Manager):
 
         # Seek to the start point of the data blocks
         self._handle.seek((self.header.data_block - 1) * 512)
+        # Number of values (words) read in regard to POINT/ANALOG data
+        N_point = 4 * self.point_used
+        N_analog = self.analog_used * self.analog_per_frame
+        # Total bytes per frame
+        point_bytes = N_point * point_word_bytes
+        analog_bytes = N_analog * analog_word_bytes
+        tot_bytes = point_bytes + analog_bytes
         # Parse the data blocks
-        for frame_no in range(self.first_frame(), self.last_frame() + 1):
-            n_word = 4 * self.point_used
-            n_tot_word = 4 * self.header.point_count
-
+        for frame_no in range(self.first_frame, self.last_frame + 1):
             # Read the byte data (used) for the block
-            raw_bytes = self._handle.read(n_word * point_word_bytes)
-
-            # Convert the bytes to a unsigned 32 bit or signed 16 bit representation
-            raw = np.frombuffer(raw_bytes,
-                                dtype=point_dtype,
-                                count=n_word).reshape((self.point_used, 4))
+            raw_bytes = self._handle.read(N_point * point_word_bytes)
+            raw_analog = self._handle.read(N_analog * analog_word_bytes)
+            # Verify read pointers (any of the two can be assumed to be 0)
+            if len(raw_bytes) < point_bytes:
+                warnings.warn(
+                    'reached end of file (EOF) while reading POINT data at frame index {} and file pointer {}!'.format(
+                    frame_no - self.first_frame, self._handle.tell()))
+                return
+            if len(raw_analog) < analog_bytes:
+                warnings.warn(
+                    'reached end of file (EOF) while reading POINT data at frame index {} and file pointer {}!'.format(
+                    frame_no - self.first_frame, self._handle.tell()))
+                return
 
             if is_float:
                 # Convert every 4 byte words to a float-32 reprensentation
                 # (the fourth column is still not a float32 representation)
                 if self.processor == PROCESSOR_DEC:
                     # Convert each of the first 6 16-bit words from DEC to IEEE float
-                    points[:,:3] = DEC_to_IEEE_BYTES(raw_bytes).reshape((self.point_used, 4))[:self.point_used,:3]
-                    # Slightly slower:
-                    #points[:,:3] = DEC_to_IEEE(raw[:self.point_used,:3])
+                    points[:,:4] = DEC_to_IEEE_BYTES(raw_bytes).reshape((self.point_used, 4))
+                    #points[:,:4] = DEC_to_IEEE_REFERENCE(raw_bytes).reshape((int(self.point_used), 4))
                 else:  # If IEEE or MIPS:
-                    # Re-read the raw byte representation directly rather then convert the
-                    # 3 first columns in the uint32 representation.
-                    points[:,:3] = np.frombuffer(raw_bytes,
+                    # Re-read the raw byte representation directly
+                    points[:,:4] = np.frombuffer(raw_bytes,
                                                  dtype=self.dtypes.float32,
-                                                 count=n_word).reshape((self.point_used, 4))[:self.point_used,:3]
+                                                 count=N_point).reshape((int(self.point_used), 4))
 
-
-
-                # Parse the camera-observed bits and residual.
-                # However, there seem to be different ways this process is interpreted,
-                # particularly regarding how invalid samples are represented:
-                # 1) Interpret value as signed int -> mask as two 16-bit words -> interpret
-                # 2) Intepret as floating-point -> Convert (round) to integer -> ...
-                # Second option was found in exported files as converted to float it represented a value of -1.0
-
-                # Invalid sample if residual is equal to -1.
+                # Parse the camera-observed bits and residuals.
                 # Notes:
+                # - Invalid sample if residual is equal to -1.
                 # - A residual of 0.0 represent modeled data (filtered or interpolated).
                 # - The same format should be used internally when a float or integer representation is used,
                 #   with the difference that the words are 16 and 8 bit respectively (see the MLS guide).
-                # - Invalidation appear to either set the int32 sign-bit (creating a negative value but not -1 specifically) or
-                #   a floating point value of -1 (method #2), where the sign is defined in the most signficant bit of the last 2 bytes.
-                #   Therefor, both sign bits are cheked introducing a issue when residual is large (i.e. greater then 01111111).
-                #   This issue could plausibly be checked by verifying 0 coordinate vectors, and/or i might have missed/missunderstood something.
-                valid = (raw[:,3] & 0x80008000) == 0
-                c = raw[valid,3]
-
+                # - While words are 16 bit, residual and camera mask is always interpreted as 8 packed in a single word!
+                # - 16 or 32 bit may represent a sign (indication that certain files write a -1 floating point only)
+                last_word = points[:, 3].astype(np.int32)
+                valid = (last_word & 0x80008000) == 0
                 points[~valid, 3:5] = -1.0
+                c = last_word[valid]
 
-                # Mask the 2 low bytes as residual bits (righmost bits)
-                points[valid, 3] = (c & 0x0000ffff).astype(float) * scale_mag
-                # Sum high bits as camera-observation count
-                points[valid, 4] = sum((c & (1 << k)) >> k for k in range(16, 32))
-
-            else: # 16 bit int representation
+            else:
+                # Convert the bytes to a unsigned 32 bit or signed 16 bit representation
+                raw = np.frombuffer(raw_bytes,
+                                    dtype=point_dtype,
+                                    count=N_point).reshape((self.point_used, 4))
                 # Read point 2 byte words in int-16 format
                 points[:, :3] = raw[:, :3] * scale_mag
 
@@ -1187,24 +1396,43 @@ class Reader(Manager):
                 points[~valid, 3:5] = -1
                 c = raw[valid, 3].astype(self.dtypes.uint16)
 
-                # fourth value is floating-point (scaled) error estimate (residual)
-                points[valid, 3] = (c & 0xff).astype(float) * scale_mag
+            # Convert coordinate data
+            # fourth value is floating-point (scaled) error estimate (residual)
+            points[valid, 3] = (c & 0xff).astype(np.float32) * scale_mag
 
-                # fifth value is number of bits set in camera-observation byte
-                points[valid, 4] = sum((c & (1 << k)) >> k for k in range(8, 17))
+            # fifth value is number of bits set in camera-observation byte
+            points[valid, 4] = sum((c & (1 << k)) >> k for k in range(8, 15))
+            #points[valid, 4] = (c >> 8)
 
+            # Check if analog data exist, and parse if so
+            if N_analog > 0:
+                if is_float and self.processor == PROCESSOR_DEC:
+                    # Convert each of the 16-bit words from DEC to IEEE float
+                    analog = DEC_to_IEEE_BYTES(raw_analog)
+                else:
+                    # Integer or INTEL/MIPS floating point data can be parsed directly
+                    analog = np.frombuffer(raw_analog, dtype=analog_dtype, count=N_analog)
 
-            if self.header.analog_count > 0:
-                n = self.header.analog_count
-                raw = np.fromstring(self._handle.read(n * analog_bytes),
-                                    dtype=analog_dtype,
-                                    count=n).reshape((-1, self.analog_used)).T
-                analog = (raw.astype(float) - offsets) * analog_scales * gen_scale
+                # Reformat and convert
+                analog = analog.reshape((-1, self.analog_used)).T
+                analog = analog.astype(float)
+                # Convert analog
+                analog = (analog - offsets) * analog_scales * gen_scale
 
+            # Output buffers
             if copy:
-                yield frame_no, points.copy(), analog.copy()
+                yield frame_no, points.copy(), analog#.copy(), analog has a new array generated per frame if not empty.
             else:
                 yield frame_no, points, analog
+
+        # Function evaluating EOF, note that data section is written in blocks of 512
+        final_byte_index = self._handle.tell()
+        self._handle.seek(0, 2)#os.SEEK_END)
+        # Check if more then 1 block remain
+        if self._handle.tell() - final_byte_index >= 512:
+            warnings.warn('incomplete reading of data blocks. {} bytes remained after all datablocks were read!'.format(
+                self._handle.tell() - final_byte_index))
+
 
     @property
     def proc_type(self):
@@ -1315,9 +1543,14 @@ class Writer(Manager):
         assert handle.tell() == 512 * (self.header.data_block - 1)
         scale = abs(self.point_scale)
         is_float = self.point_scale < 0
-        point_dtype = [np.int16, np.float32][is_float]
-        point_scale = [scale, 1][is_float]
-        point_format = 'if'[is_float]
+        if is_float:
+            point_dtype = np.float32
+            point_format = 'f'
+            point_scale = 1.0
+        else:
+            point_dtype = np.int16
+            point_format = 'i'
+            point_scale = scale
         raw = np.empty((self.point_used, 4), point_dtype)
         for points, analog in self._frames:
             valid = points[:, 3] > -1
@@ -1366,7 +1599,8 @@ class Writer(Manager):
                             dimensions=list(dimensions))
 
         def add_empty_array(name, desc, bpe):
-            group.add_param(name, dtypes, desc=desc, bytes_per_element=bpe, dimensions=[0])
+            group.add_param(name, dtypes, desc=desc,
+                            bytes_per_element=bpe, dimensions=[0])
 
         points, analog = self._frames[0]
         ppf = len(points)
@@ -1375,7 +1609,7 @@ class Writer(Manager):
 
         # Get longest label name
         label_max_size = 0
-        label_max_size = max(label_max_size, [len(label) for label in labels])
+        label_max_size = max(label_max_size, np.max([len(label) for label in labels]))
 
         group = self.add_group(1, 'POINT', 'POINT group')
         add('USED', 'Number of 3d markers', 2, '<H', ppf)
@@ -1385,9 +1619,11 @@ class Writer(Manager):
         add('RATE', '3d data capture rate', 4, '<f', self._point_rate)
         add_str('X_SCREEN', 'X_SCREEN parameter', '+X', 2)
         add_str('Y_SCREEN', 'Y_SCREEN parameter', '+Y', 2)
-        add_str('UNITS', '3d data units', self._point_units, len(self._point_units))
+        add_str('UNITS', '3d data units',
+                self._point_units, len(self._point_units))
+
         add_str('LABELS', 'labels', ''.join(labels[i].ljust(label_max_size)
-                for i in range(ppf)), abel_max_size, ppf)
+                for i in range(ppf)), label_max_size, ppf)
         add_str('DESCRIPTIONS', 'descriptions', ' ' * 16 * ppf, 16, ppf)
 
         # ANALOG group
