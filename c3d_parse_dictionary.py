@@ -446,58 +446,99 @@ class C3DParseDictionary:
         # Return the conversion factor
         return conv_fac
 
-    def parseLabels(self, group_id, param_ids=['LABELS', 'LABELS2'], make_unique=True, empty_label_prefix='EMPTY'):
+    def parseLabels(self, group_id, param_ids=['LABELS']):
         ''' Get a list of labels from a group.
 
         Params:
         ----
         group_id:   Group from which the labels should be parsed.
-        param_ids:  List of parameter identifiers for which label information is stored.
-        Returns:    Python list of label strings.
+        param_ids:  List of parameter identifiers for which label information is stored, default is: ['LABELS'].
+                    Note that all label parameters will be checked for extended formats such as
+        Returns:    Numpy list of label strings.
         '''
         if not islist(param_ids):
             param_ids = [param_ids]
 
-        labels = []
-        for pid in param_ids:
+
+        def parseLabelParam(pid):
             glabels = self.parseParamString(group_id, pid)
             if islist(glabels):
-                labels.append(glabels)
+                return glabels
             elif glabels is not None:  # is string
-                labels.append([glabels])
+                return [glabels]
+            return None
+
+        labels = []
+        for pid in param_ids:
+            # Base case, first label parameter.
+            plabel = parseLabelParam(pid)
+            # Repeat checking for extended label parameters until none is found.
+            i = 2
+            while plabel is not None:
+                # If labels were found, append.
+                labels.append(plabel)
+                plabel = parseLabelParam("%s%i"%(plabel, i))
+                i += 1
+
+
+        # Todo, sort Vicon point data.
 
         if len(labels) > 0:
-            labels = np.concatenate(labels)
-
-            # Make labels unique
-            if make_unique:
-                unique_labels, indices, count = np.unique(labels, return_inverse=True, return_counts=True)
-                N = len(indices)
-                counter = np.zeros(N, np.int32)
-                for i in range(N):
-                    index = indices[i]
-                    if count[index] > 1:
-                        counter[index] += 1
-                        label = labels[i] if labels[i] != '' else empty_label_prefix
-                        labels[i] = '%s_%00i' % (label, counter[index])
-
-            return labels
+            return np.concatenate(labels)
         else:
             return np.array([])
+
 
     def getPointChannelLabels(self, empty_label_prefix='EMPTY', missing_label_prefix='UNKNOWN'):
         ''' Determine a set of unique labels for POINT data channels.
         '''
-        labels = self.parseLabels('POINT', make_unique=True)
+        labels = self.parseLabels('POINT')
+
         used_label_count = self.reader.point_used
         if used_label_count == 0:
-            return labels
+            return []
 
         if len(labels) >= used_label_count:
             return labels[:used_label_count]
         else:
+            # Generate labels if the number of parsed count is less then POINT samples.
             unknown = ['%s_%00i' % (missing_label_prefix, i) for i in range(used_label_count - len(labels))]
             return np.concatenate((labels, unknown))
+
+    def generateUniqueLabels(labels, empty_label_prefix='EMPTY'):
+        ''' Generate an unique set label strings on form 'LABELXX'.
+
+        Params:
+        ----
+        labels:               List of label strings.
+        empty_label_prefix:   Empty label strings will be replaced with the prefix.
+        Returns:              Numpy list of label strings.
+        '''
+
+        # Count duplicate labels
+        unique_labels, indices, count = np.unique(labels, return_inverse=True, return_counts=True)
+        out_list = labels.copy()
+        counter = np.zeros(len(indices), np.int32)
+        for i in range(len(indices)):
+        index = indices[i]
+        # If duplicate labels exist
+        if count[index] > 1:
+            counter[index] += 1
+            # Generate unique label for repeated labels (if empty use prefix)
+            label = labels[i] if labels[i] != '' else empty_label_prefix
+            out_list[i] = '%s_%00i' % (label, counter[index])
+        return out_list
+
+
+    def generateLabelMask(labels):
+        '''
+        '''
+        mask = np.ones(np.shape(labels), dtype=np.bool)
+        return mask
+
+
+    def getViconSystemPointLabelMask():
+        return []
 
 
     """
