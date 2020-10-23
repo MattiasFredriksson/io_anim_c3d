@@ -506,7 +506,7 @@ class C3DParseDictionary:
             return np.concatenate((labels, unknown))
 
     def generateUniqueLabels(labels, empty_label_prefix='EMPTY'):
-        ''' Generate an unique set label strings on form 'LABELXX'.
+        ''' Generate an unique set label strings on form 'LABEL_XX'.
 
         Params:
         ----
@@ -517,29 +517,90 @@ class C3DParseDictionary:
 
         # Count duplicate labels
         unique_labels, indices, count = np.unique(labels, return_inverse=True, return_counts=True)
-        out_list = labels.copy()
+        out_list = [None]*len(labels)
         counter = np.zeros(len(indices), np.int32)
         for i in range(len(indices)):
             index = indices[i]
+            label = labels[i] if labels[i] != '' else empty_label_prefix
             # If duplicate labels exist
             if count[index] > 1:
                 counter[index] += 1
                 # Generate unique label for repeated labels (if empty use prefix)
-                label = labels[i] if labels[i] != '' else empty_label_prefix
-                out_list[i] = '%s_%00i' % (label, counter[index])
-        return out_list
+                label = '%s_%02i' % (label, counter[index])
+            out_list[i] = label
+        return np.array(out_list)
 
 
-    def generateLabelMask(labels):
+    def generateLabelMask(self, labels, group='POINT'):
+        ''' Generate a mask for specified labels in accordance with common/software specific rules.
+
+            Parameters:
+            -----
+            labels: Labels for which the mask should be generated.
+            group:  Group labels are associated with, should be 'POINT' or 'ANALOG'.
+            Return: Mask defined using a numpy bool array of equal shape to label argument.
         '''
+        dict = self.getSoftwareDictionary()
+        if dict is not None:
+            return self.generateSoftwareLabelMask(dict, labels, group)
+
+        return np.ones(np.shape(labels), dtype=np.bool)
+
+
+    def generateSoftwareLabelMask(self, dict, labels, group='POINT'):
+        ''' Generate a label mask in regard to the software used to generate the file.
+            Parameters are defined by getSoftwareDictionary().
+
+            Parameters:
+            -----
+            dict:   Python dict as fetched using getSoftwareDictionary().
+            labels: Labels for which the mask should be generated.
+            group:  Group labels are associated with, should be 'POINT' or 'ANALOG'.
+            Return: Mask defined using a numpy bool array of equal shape to label argument.
         '''
+
         mask = np.ones(np.shape(labels), dtype=np.bool)
+        equal, contain, param = dict[('%s_EXCLUDE' % group)]
+
+        def contains_seq(item, words):
+            ''' Checks if any word in words matches a sequence in the item. '''
+            for word in words:
+                if word in item:
+                    return True
+            return False
+
+        # Remove labels equivalent to parameter defined words and words defined in the dict.
+        equal = np.concatenate((equal, self.parseLabels(group, param)))
+        if len(equal) > 0:
+            for i, l in enumerate(labels):
+                if l in equal:
+                    mask[i] = False
+        # Remove labels with matching sub-sequences
+        if len(contain) > 0:
+            for i, l in enumerate(labels):
+                if contains_seq(l, contain):
+                    mask[i] = False
+
         return mask
 
 
-    def getViconSystemPointLabelMask():
-        return []
+    def getSoftwareDictionary(self):
+        ''' Fetch software specific dictionaries defining parameters used to
+            manage specific software implementations.
+        '''
+        software = self.parseParamString('MANUFACTURER', 'SOFTWARE')
 
+        if software is not None:
+            if 'vicon' in software.lower():
+                return C3DParseDictionary.getViconDictionary()
+        # No specific software matched
+        return None
+
+
+    def getViconDictionary():
+        return {
+            'POINT_EXCLUDE':[[], [], ['ANGLES', 'FORCES', 'POWERS', 'MOMENTS']] # Equal, contain, parameter
+        }
 
     """
     --------------------------------------------------------

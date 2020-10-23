@@ -4,6 +4,7 @@ import os
 
 import_dir = "C:\\Projects\\Code\\Blender\\Addons\\io_anim_c3d\\ignore"
 import_dir = "C:\\Projects\\Code\\Blender\\Addons\\io_anim_c3d\\test\\testfiles\\sample01"
+import_dir = "C:\\Projects\\Code\\Blender\\Addons\\io_anim_c3d\\test\\testfiles\\sample00\\Advanced Realtime Tracking GmbH"
 os.chdir(import_dir)
 files = glob.glob("*.c3d")
 
@@ -15,16 +16,13 @@ armature_obj = None
 
 
 print('Matching files: '+str(len(files)))
-print(files)
 if len(files) == 0:
-    raise Error('No matching files found')
-    
+	raise Error('No matching files found')
+
 # Parse files
 for file in files:
-    # Parse
-    bpy.ops.import_anim.c3d(filepath=file)
-    # Fetch loaded objects
-    obj = bpy.context.selected_objects[0] 
-    action = obj.animation_data.action
-    
-     
+	# Parse
+	bpy.ops.import_anim.c3d(filepath=file, load_mem_efficient=False)
+	# Fetch loaded objects
+	obj = bpy.context.selected_objects[0]
+	action = obj.animation_data.action

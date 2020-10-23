@@ -40,6 +40,8 @@ def load(operator, context, filepath="",
          interpolation='LINEAR',
          min_camera_count=0,
          max_residual=0.0,
+         exclude_empty_labels=True,
+         apply_label_mask=True,
          load_mem_efficient=False,
          print_file=True):
 
@@ -81,9 +83,13 @@ def load(operator, context, filepath="",
         global_orient *= scale  # Uniform scale axis
 
 
-    # Read labels
+    # Read labels, remove labels matching criteria as defined
+    # in regard to the software used to generate the file.
     labels = parser.getPointChannelLabels()
-    # Equivalent to number of channels defined for POINT data
+    if apply_label_mask:
+        point_mask = parser.generateLabelMask(labels, 'POINT')
+    labels = C3DParseDictionary.generateUniqueLabels(labels[point_mask])
+    # Equivalent to number of channels used in POINT data
     nlabels = len(labels)
 
     # Number of frames [first, last] => +1
@@ -93,19 +99,8 @@ def load(operator, context, filepath="",
     nframes = parser.last_frame - first_frame + 1
     perfmon.message('Parsing: %i frames...' % nframes)
 
-    # Create an armature adapted to the data (if specified)
-    arm_obj = None
-    bone_radius = bone_size * 0.5
-    if create_armature:
-        arm_obj = create_armature_object(context, file_name, 'BBONE')
-        add_empty_armature_bones(context, arm_obj, labels, bone_size)
-        # Set the width of the bbones
-        for bone in arm_obj.data.bones:
-            bone.bbone_x = bone_radius
-            bone.bbone_z = bone_radius
-
     # Create an action
-    action = create_action(file_name, arm_obj, fake_user)
+    action = create_action(file_name, fake_user=fake_user)
     # Generate location (x,y,z) F-Curves for each label
     blen_curves_arr = generate_blend_curves(action, labels, 3, 'pose.bones["%s"].location')
     # Format the curve list in sets of 3
@@ -119,14 +114,33 @@ def load(operator, context, filepath="",
                                 perfmon)
     else:
         # Default processing func.
-        read_data_processor_efficient(parser, blen_curves, labels, global_orient,
+        read_data_processor_efficient(parser, blen_curves, labels, point_mask, global_orient,
                                       first_frame, nframes, conv_fac_frame_rate,
                                       interpolation, min_camera_count, max_residual,
                                       perfmon)
 
+    # Remove labels with no valid keyframes
+    if exclude_empty_labels:
+        clean_empty_fcurves(action)
     # Since we inserted our keyframes in 'FAST' mode, we have to update the fcurves now.
-    for fc in blen_curves_arr:
+    for fc in action.fcurves:
         fc.update()
+
+
+
+    # Create an armature adapted to the data (if specified)
+    arm_obj = None
+    bone_radius = bone_size * 0.5
+    if create_armature:
+        final_labels = [fc.group.name for fc in action.fcurves]
+        arm_obj = create_armature_object(context, file_name, 'BBONE')
+        add_empty_armature_bones(context, arm_obj, final_labels, bone_size)
+        # Set the width of the bbones
+        for bone in arm_obj.data.bones:
+            bone.bbone_x = bone_radius
+            bone.bbone_z = bone_radius
+        # Set generated action as active
+        set_action(arm_obj, action, replace=False)
 
     perfmon.level_down("Import finished.")
 
@@ -135,7 +149,7 @@ def load(operator, context, filepath="",
 
 
 def valid_points(point_block, min_camera_count, max_residual):
-    ''' Determine valid points in a block.
+    ''' Generate a mask for valid points read for a frame.
     '''
     valid = point_block[:, 4] >= min_camera_count
     if max_residual > 0.0:
@@ -143,37 +157,41 @@ def valid_points(point_block, min_camera_count, max_residual):
     return valid
 
 
-def read_data_processor_efficient(parser, blen_curves, labels, global_orient,
+def read_data_processor_efficient(parser, blen_curves, labels, point_mask, global_orient,
                                   first_frame, nframes, conv_fac_frame_rate,
                                   interpolation, min_camera_count, max_residual,
                                   perfmon):
-    '''Read and keyframe POINT data.
+    '''   Read and keyframe POINT data.
     '''
     nlabels = len(labels)
 
+    # Generate numpy arrays to store read frame data before generating keyframes
     point_frames = np.zeros([nframes, 3, nlabels], dtype=np.float64)
-    valid = np.empty([nframes, nlabels], dtype=np.bool)
+    valid_samples = np.empty([nframes, nlabels], dtype=np.bool)
 
+    ##
     # Start reading POINT blocks (and analog, but signals from force plates etc. are not supported...)
     perfmon.level_up('Reading POINT data..', True)
     for i, points, analog in parser.reader.read_frames(copy=False):
         index = i - first_frame
+        # Apply masked samples
+        points = points[point_mask]
+        # Determine valid samples using columns 3:4
+        valid_samples[index] = valid_points(points, min_camera_count, max_residual)
 
-        # Determine valid samples
-        valid[index] = valid_points(points, min_camera_count, max_residual)
-
-        # Extract columns 0:3
-        point_frames[index] = points[0:nlabels, 0:3].T
+        # Extract position coordinates from columns 0:3
+        point_frames[index] = points[:, 0:3].T
 
     # Re-orient and scale the data
     point_frames = np.matmul(global_orient, point_frames)
 
     perfmon.level_down('Reading Done.')
 
+    ##
     # Time to generate keyframes
     perfmon.level_up('Keyframing POINT data..', True)
     # Number of valid keys for each label
-    nkeys = np.sum(valid, axis=0)
+    nkeys = np.sum(valid_samples, axis=0)
     frame_range = np.arange(0, nframes)
     # Iterate each group (tracker label)
     for group_ind, fc_set in enumerate(blen_curves):
@@ -182,7 +200,7 @@ def read_data_processor_efficient(parser, blen_curves, labels, global_orient,
             fc.keyframe_points.add(nkeys[group_ind])
 
         # Iterate valid frames and insert keyframes
-        indices = frame_range[valid[:, group_ind]]
+        indices = frame_range[valid_samples[:, group_ind]]
         for key_ind, (frame, p) in enumerate(zip(indices, point_frames[indices, :, group_ind])):
             for dim, fc in enumerate(fc_set):
                 kf = fc.keyframe_points[key_ind]
@@ -262,11 +280,22 @@ def create_action(action_name, object=None, fake_user=False):
 
     # If none yet assigned, assign this action to id_data.
     if object:
-        if not object.animation_data:
-            object.animation_data_create()
-        if not object.animation_data.action:
-            object.animation_data.action = action
+        set_action(object, action, replace=False)
     return action
+
+
+def set_action(object, action, replace=True):
+    ''' Set the action associated with the object.
+    -----
+    object:    Object for which the animation should be set.
+    action:    Action to set for the object.
+    replace:   If False, existing action set for the object will not be replaced.
+    '''
+    if not object.animation_data:
+        object.animation_data_create()
+    if replace or not object.animation_data.action:
+        object.animation_data.action = action
+
 
 
 def create_armature_object(context, name, display_type='OCTAHEDRAL'):
@@ -373,3 +402,20 @@ def generate_blend_curves(action, labels, grp_channel_count, fc_data_path_str):
         blen_curves = [action.fcurves.new(fc_data_path_str % label, index=i, action_group=label)
                        for label in labels for i in range(grp_channel_count)]
     return blen_curves
+
+def clean_empty_fcurves(action):
+    '''
+    Remove any F-Curve in the action with no keyframes.
+
+    Parameters
+    ----
+    action:             bpy.types.Action object to clean F-curves.
+
+    '''
+    empty_curves = []
+    for curve in action.fcurves:
+        if len(curve.keyframe_points) == 0:
+            empty_curves.append(curve)
+
+    for curve in empty_curves:
+        action.fcurves.remove(curve)

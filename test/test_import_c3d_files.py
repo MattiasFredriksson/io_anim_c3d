@@ -8,12 +8,17 @@ import unittest
 
 
 
-class ImportC3DTestSample00(unittest.TestCase):
+class ImportC3DTestMultipleFiles(unittest.TestCase):
 
     def setUpClass():
-        IMPORT_DIR = "C:\\Projects\\Code\\Blender\\Addons\\io_anim_c3d\\test\\testfiles\\sample01"
+        IMPORT_DIR = "C:\\Projects\\Code\\Blender\\Addons\\io_anim_c3d\\test\\testfiles\\sample00"
+        IMPORT_DIR = "C:\\Projects\\Code\\Blender\\Addons\\io_anim_c3d\\test\\testfiles\\sample00\\Vicon Motion Systems"
         os.chdir(IMPORT_DIR)
         FILES = glob.glob("*.c3d")
+        # Recurse one directory
+        for file in os.listdir('.'):
+            if os.path.isdir(file):
+                FILES += glob.glob(os.path.join(file, '*.c3d'))
 
         objs = []
         actions = []
@@ -21,14 +26,14 @@ class ImportC3DTestSample00(unittest.TestCase):
         # Parse files
         for file in FILES:
             # Parse
-            bpy.ops.import_anim.c3d(filepath=os.path.join(IMPORT_DIR, file), print_file=False)
+            bpy.ops.import_anim.c3d(filepath=os.path.join(IMPORT_DIR, file), print_file=False, load_mem_efficient=False)
             # Fetch loaded objects
             obj = bpy.context.selected_objects[0]
             objs.append(obj)
             actions.append(obj.animation_data.action)
 
-        ImportC3DTestSample00.objs = objs
-        ImportC3DTestSample00.actions = actions
+        ImportC3DTestMultipleFiles.objs = objs
+        ImportC3DTestMultipleFiles.actions = actions
 
     def test_A_channel_count(self):
         ''' Verify loaded animations has channels
