@@ -79,7 +79,7 @@ def parseC3DArray(param, dtype=np.int8):
     '''
     return param._as_any(dtype)
 
-def parseC3DString(param, dtype=np.int8):
+def parseC3DString(param):
     ''' Parse data as an array of, or single string.
 
     Params:
@@ -87,12 +87,11 @@ def parseC3DString(param, dtype=np.int8):
     param:	 c3d.Param object
     Returns: String or array (np.ndarray) of strings
     '''
-    data = parseC3DArray(param, dtype)
-    if isvector(param):  # Attribute is a single string vector
-        return data.tostring().decode("ascii").strip()
-    else:  # Attribute is composed of an array of strings (or ndim?)
-        list = [word.tostring().decode("ascii").strip() for word in data]
-        return np.array(list)
+    data = param.string_array
+    list = [word.strip() for word in data]
+    if len(list) == 1:
+        return list[0]
+    return np.array(list)
 
 
 class C3DParseDictionary:
