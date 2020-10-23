@@ -520,13 +520,13 @@ class C3DParseDictionary:
         out_list = labels.copy()
         counter = np.zeros(len(indices), np.int32)
         for i in range(len(indices)):
-        index = indices[i]
-        # If duplicate labels exist
-        if count[index] > 1:
-            counter[index] += 1
-            # Generate unique label for repeated labels (if empty use prefix)
-            label = labels[i] if labels[i] != '' else empty_label_prefix
-            out_list[i] = '%s_%00i' % (label, counter[index])
+            index = indices[i]
+            # If duplicate labels exist
+            if count[index] > 1:
+                counter[index] += 1
+                # Generate unique label for repeated labels (if empty use prefix)
+                label = labels[i] if labels[i] != '' else empty_label_prefix
+                out_list[i] = '%s_%00i' % (label, counter[index])
         return out_list
 
 
