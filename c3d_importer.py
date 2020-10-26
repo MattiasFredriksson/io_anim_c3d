@@ -40,7 +40,7 @@ def load(operator, context, filepath="",
          interpolation='LINEAR',
          min_camera_count=0,
          max_residual=0.0,
-         exclude_empty_labels=True,
+         include_empty_labels=False,
          apply_label_mask=True,
          load_mem_efficient=False,
          print_file=True):
@@ -88,6 +88,8 @@ def load(operator, context, filepath="",
     labels = parser.getPointChannelLabels()
     if apply_label_mask:
         point_mask = parser.generateLabelMask(labels, 'POINT')
+    else:
+        point_mask = np.ones(np.shape(labels), np.bool)
     labels = C3DParseDictionary.generateUniqueLabels(labels[point_mask])
     # Equivalent to number of channels used in POINT data
     nlabels = len(labels)
@@ -108,7 +110,7 @@ def load(operator, context, filepath="",
 
     if load_mem_efficient:
         # Primarily a test function.
-        read_data_mem_efficient(parser, blen_curves, labels, global_orient,
+        read_data_mem_efficient(parser, blen_curves, labels, point_mask, global_orient,
                                 first_frame, nframes, conv_fac_frame_rate,
                                 interpolation, min_camera_count, max_residual,
                                 perfmon)
@@ -120,7 +122,7 @@ def load(operator, context, filepath="",
                                       perfmon)
 
     # Remove labels with no valid keyframes
-    if exclude_empty_labels:
+    if not include_empty_labels:
         clean_empty_fcurves(action)
     # Since we inserted our keyframes in 'FAST' mode, we have to update the fcurves now.
     for fc in action.fcurves:
@@ -210,7 +212,7 @@ def read_data_processor_efficient(parser, blen_curves, labels, point_mask, globa
     perfmon.level_down('Keyframing Done.')
 
 
-def read_data_mem_efficient(parser, blen_curves, labels, global_orient,
+def read_data_mem_efficient(parser, blen_curves, labels, point_mask, global_orient,
                             first_frame, nframes, conv_fac_frame_rate,
                             interpolation, min_camera_count, max_residual,
                             perfmon):
@@ -229,7 +231,7 @@ def read_data_mem_efficient(parser, blen_curves, labels, global_orient,
     read_sampler, key_sampler = new_sampler(True), new_sampler()
 
     for i, points, analog in parser.reader.read_frames(copy=False):
-
+        points = points[point_mask]
         # Determine valid samples
         valid = valid_points(points, min_camera_count, max_residual)
 

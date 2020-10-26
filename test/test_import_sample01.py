@@ -8,7 +8,7 @@ import unittest
 
 
 
-class ImportC3DTestSample00(unittest.TestCase):
+class ImportC3DTestSample01(unittest.TestCase):
 
     def setUpClass():
         IMPORT_DIR = "C:\\Projects\\Code\\Blender\\Addons\\io_anim_c3d\\test\\testfiles\\sample01"
@@ -21,14 +21,14 @@ class ImportC3DTestSample00(unittest.TestCase):
         # Parse files
         for file in FILES:
             # Parse
-            bpy.ops.import_anim.c3d(filepath=os.path.join(IMPORT_DIR, file), print_file=False)
+            bpy.ops.import_anim.c3d(filepath=os.path.join(IMPORT_DIR, file), print_file=False, load_mem_efficient=True, include_empty_labels=False)
             # Fetch loaded objects
             obj = bpy.context.selected_objects[0]
             objs.append(obj)
             actions.append(obj.animation_data.action)
 
-        ImportC3DTestSample00.objs = objs
-        ImportC3DTestSample00.actions = actions
+        ImportC3DTestSample01.objs = objs
+        ImportC3DTestSample01.actions = actions
 
     def test_A_channel_count(self):
         ''' Verify number of channels are equal
@@ -37,16 +37,27 @@ class ImportC3DTestSample00(unittest.TestCase):
         for action in self.actions[1:]:
             self.assertEqual(len(a0.fcurves), len(action.fcurves))
 
-    def test_B_channel_names(self):
-        ''' Verify channel names are equal and ordered
+    def test_B_tracker_names(self):
+        ''' Verify labels for each channel group are equal and ordered
         '''
         a0 = self.actions[0]
         for action in self.actions[1:]:
             for i in range(len(a0.fcurves)):
                 self.assertEqual(a0.fcurves[i].group.name, action.fcurves[i].group.name)
 
+    def test_C_tracker_labels(self):
+        ''' Verify data labels match assigned channel group names
+        '''
+        LABELS = ['RFT1', 'RFT2', 'RFT3', 'LFT1', 'LFT2', 'LFT3', 'RSK1', 'RSK2', 'RSK3', 'RSK4',
+            'LSK1', 'LSK2', 'LSK3', 'LSK4', 'RTH1', 'RTH2', 'RTH3', 'RTH4', 'LTH1', 'LTH2', 'LTH3', 'LTH4',
+            'PV1', 'PV2', 'PV3', 'pv4']#, 'TR2', 'TR3', 'RA', 'LA', 'RK', 'LK', 'RH', 'LH', 'RPP', 'LPP', 'RS', 'LS']
 
-    def test_C_keyframe_count(self):
+        for action in self.actions:
+            names = [fc.group.name for fc in action.fcurves]
+            for label in LABELS:
+                self.assertIn(label, names)
+
+    def test_D_keyframe_count(self):
         ''' Verify number of keyframes are identical
         '''
         a0 = self.actions[0]
@@ -55,7 +66,7 @@ class ImportC3DTestSample00(unittest.TestCase):
                 self.assertEqual(len(a0.fcurves[i].keyframe_points), len(action.fcurves[i].keyframe_points))
 
 
-    def test_D_keyframes_equal(self):
+    def test_E_keyframes_equal(self):
         ''' Verify keyframes are identical
         '''
         a0 = self.actions[0]

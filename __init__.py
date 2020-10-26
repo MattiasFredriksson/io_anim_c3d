@@ -113,13 +113,13 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
 
     create_armature: BoolProperty(
         name="Create Armature",
-        description="Generate an armature for the data",
+        description="Generate an armature to display the animated point cloud",
         default=True,
     )
 
     bone_size: FloatProperty(
         name="Marker Size", default=0.02,
-        description="Define the width of each marker",
+        description="Define the width of each marker bone",
         min=0.001, max=10.0,
         soft_min=0.01, soft_max=1.0,
     )
@@ -177,9 +177,15 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     min_camera_count: IntProperty(
         name="Min. camera count",
         description="""Minimum number of cameras recording a marker for it to be considered a valid recording
-                       (non-occluded). Note that NOT all files record visibility counters""",
+                       (non-occluded).. Note that NOT all files record visibility counters""",
         min=0, max=10,
         default=0,
+    )
+
+    include_empty_labels: BoolProperty(
+        name="Include empty labels",
+        description="Create channels for labels with no valid keyframes",
+        default=False,
     )
 
     print_file: BoolProperty(
@@ -246,6 +252,7 @@ class C3D_PT_action(bpy.types.Panel):
         layout.prop(operator, "interpolation")
         layout.prop(operator, "min_camera_count")
         layout.prop(operator, "max_residual")
+        layout.prop(operator, "include_empty_labels")
 
 
 class C3D_PT_marker_armature(bpy.types.Panel):
