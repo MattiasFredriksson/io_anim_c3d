@@ -40,7 +40,8 @@ class ImportC3DTestVicon(unittest.TestCase):
     def test_C_tracker_labels(self):
         ''' Verify label array matches
         '''
-        LABELS = ['Table:Table1', 'Table:Table2', 'Table:Table3', 'Table:Table4', 'Table:Table5', 'Table:Table6', 'Table:Table7', 'Table:Table8', 'Table:Table9',
+        LABELS = [
+        'Table:Table1', 'Table:Table2', 'Table:Table3', 'Table:Table4', 'Table:Table5', 'Table:Table6', 'Table:Table7', 'Table:Table8', 'Table:Table9',
         'Player01:RFHD', 'Player01:RBHD', 'Player01:LFHD', 'Player01:RFHD', 'Player01:C7', 'Player01:T10', 'Player01:CLAV', 'Player01:STRN', 'Player01:RBAK',
         'Player01:LSHO', 'Player01:LUPA', 'Player01:LELB', 'Player01:LWRA', 'Player01:LFRM', 'Player01:LWRB', 'Player01:RSHO', 'Player01:RELB', 'Player01:RWRA', 'Player01:RFIN',
         'Player01:RASI', 'Player01:RPSI', 'Player01:LKNE', 'Player01:LANK', 'Player01:LTOE', 'Player01:RKNE', 'Player01:RANK', 'Player01:RTOE', 'Player01:LFIN', 'Player01:RUPA',
@@ -74,9 +75,7 @@ class ImportC3DTestVicon(unittest.TestCase):
         'Player01:CentreOfMass', 'Player01:CentreOfMassFloor', 'Player01:CentreOfMass', 'Player01:CentreOfMassFloor'
         ]
 
-        print(len(LABELS))
-
-        names = [fc.group.name for fc in ImportC3DTestVicon.action.fcurves]
+        names = [fc_grp.name for fc_grp in ImportC3DTestVicon.action.groups]
         for label in LABELS:
             self.assertIn(label, names)
 

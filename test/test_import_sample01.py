@@ -53,7 +53,7 @@ class ImportC3DTestSample01(unittest.TestCase):
             'PV1', 'PV2', 'PV3', 'pv4']#, 'TR2', 'TR3', 'RA', 'LA', 'RK', 'LK', 'RH', 'LH', 'RPP', 'LPP', 'RS', 'LS']
 
         for action in self.actions:
-            names = [fc.group.name for fc in action.fcurves]
+            names = [fc_grp.name for fc_grp in action.groups]
             for label in LABELS:
                 self.assertIn(label, names)
 

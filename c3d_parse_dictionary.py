@@ -87,12 +87,11 @@ def parseC3DString(param):
     param:	 c3d.Param object
     Returns: String or array (np.ndarray) of strings
     '''
-    data = param.string_array
-    if len(np.shape(data)) == 1 and len(data) == 1:
-        return data[0].strip()
-    # Convert to an array of python strings
-    strarr = np.empty(np.shape(data), dtype=object)
-    for i, v in np.ndenumerate(data):
+    strarr = param.string_array
+    if len(np.shape(strarr)) == 1 and len(strarr) == 1:
+        return strarr[0].strip()
+    # Strip
+    for i, v in np.ndenumerate(strarr):
         strarr[i] = v.strip()
     return strarr
 
