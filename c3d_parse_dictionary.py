@@ -89,8 +89,12 @@ def parseC3DString(param):
     '''
     data = param.string_array
     if len(np.shape(data)) == 1 and len(data) == 1:
-        return data[0]
-    return data
+        return data[0].strip()
+    # Convert to an array of python strings
+    strarr = np.empty(np.shape(data), dtype=object)
+    for i, v in np.ndenumerate(data):
+        strarr[i] = v.strip()
+    return strarr
 
 
 class C3DParseDictionary:
@@ -491,7 +495,6 @@ class C3DParseDictionary:
         ''' Determine a set of unique labels for POINT data channels.
         '''
         labels = self.parseLabels('POINT')
-        print(len(labels), self.reader.point_used)
 
         used_label_count = self.reader.point_used
         if used_label_count == 0:
