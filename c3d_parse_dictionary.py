@@ -378,8 +378,8 @@ class C3DParseDictionary:
             O_data[:, 1] = axis_y
             O_data[:, 2] = np.cross(axis_x, axis_y)
         else:
-            msg = '''Unable to parse X/Y_SCREEN information for POINT data,
-                     manual adjustment to orientation may be necessary.'''
+            msg = 'Unable to parse X/Y_SCREEN information for POINT data, ' +\
+                  'manual adjustment to orientation may be necessary.'
 
         # Define the system third axis as the cross product:
         O_sys = np.empty((3, 3))
