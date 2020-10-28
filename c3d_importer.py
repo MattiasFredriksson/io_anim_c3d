@@ -82,9 +82,11 @@ def load(operator, context, filepath="",
         # Convert to a numpy array matrix
         global_orient = np.array(global_orient)
     else:
-        global_orient = parser.axis_interpretation([0, 0, 1], [0, 1, 0])
+        global_orient, msg = parser.axis_interpretation([0, 0, 1], [0, 1, 0])
         global_orient *= scale  # Uniform scale axis
 
+        if msg is not None:
+            operator.report({'INFO'}, msg)
 
     # Read labels, remove labels matching criteria as defined
     # in regard to the software used to generate the file.
@@ -134,13 +136,11 @@ def load(operator, context, filepath="",
     for fc in action.fcurves:
         fc.update()
 
-
     if action.fcurves == 0:
         remove_action(action)
         # All samples were either invalid or was previously culled in regard to the channel label.
         operator.report({'WARNING'}, 'No valid POINT data in file: %s' % filepath)
         return {'CANCELLED'}
-
 
     # Create an armature adapted to the data (if specified)
     arm_obj = None
@@ -297,6 +297,7 @@ def create_action(action_name, object=None, fake_user=False):
         set_action(object, action, replace=False)
     return action
 
+
 def remove_action(action):
     ''' Delete a specific action.
     '''
@@ -314,7 +315,6 @@ def set_action(object, action, replace=True):
         object.animation_data_create()
     if replace or not object.animation_data.action:
         object.animation_data.action = action
-
 
 
 def create_armature_object(context, name, display_type='OCTAHEDRAL'):
@@ -421,6 +421,7 @@ def generate_blend_curves(action, labels, grp_channel_count, fc_data_path_str):
         blen_curves = [action.fcurves.new(fc_data_path_str % label, index=i, action_group=label)
                        for label in labels for i in range(grp_channel_count)]
     return blen_curves
+
 
 def clean_empty_fcurves(action):
     '''

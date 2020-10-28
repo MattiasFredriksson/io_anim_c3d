@@ -79,6 +79,7 @@ def parseC3DArray(param, dtype=np.int8):
     '''
     return param._as_any(dtype)
 
+
 def parseC3DString(param):
     ''' Parse data as an array of, or single string.
 
@@ -353,30 +354,32 @@ class C3DParseDictionary:
         Returns:       3x3 orientation matrix for converting 3D data points.
         '''
         # Axis conversion dictionary
-        axis_dict = {
-            'X':  [1.0, 0, 0],
+        AXIS_DICT = {
+            'X': [1.0, 0, 0],
             '+X': [1.0, 0, 0],
             '-X': [-1.0, 0, 0],
-            'Y':  [0, 1.0, 0],
+            'Y': [0, 1.0, 0],
             '+Y': [0, 1.0, 0],
             '-Y': [0, -1.0, 0],
-            'Z':  [0, 0, 1.0],
+            'Z': [0, 0, 1.0],
             '+Z': [0, 0, 1.0],
             '-Z': [0, 0, -1.0],
-            }
+        }
         O_data = np.identity(3)
+        msg = None
 
         axis_x = self.parseParamString('POINT', 'X_SCREEN')
         axis_y = self.parseParamString('POINT', 'Y_SCREEN')
         # Convert
-        if axis_x in axis_dict and axis_y in axis_dict:
-            axis_x = axis_dict[axis_x]
-            axis_y = axis_dict[axis_y]
+        if axis_x in AXIS_DICT and axis_y in AXIS_DICT:
+            axis_x = AXIS_DICT[axis_x]
+            axis_y = AXIS_DICT[axis_y]
             O_data[:, 0] = axis_x
             O_data[:, 1] = axis_y
             O_data[:, 2] = np.cross(axis_x, axis_y)
         else:
-            print('Unable to parse X/Y_SCREEN information for POINT data')
+            msg = '''Unable to parse X/Y_SCREEN information for POINT data,
+                     manual adjustment to orientation may be necessary.'''
 
         # Define the system third axis as the cross product:
         O_sys = np.empty((3, 3))
@@ -384,7 +387,7 @@ class C3DParseDictionary:
         O_sys[:, 2] = sys_axis_up / np.linalg.norm(sys_axis_up)
         O_sys[:, 0] = np.cross(O_sys[:, 1], O_sys[:, 2])
         # Orient from data basis -> system basis
-        return np.matmul(O_sys, O_data.T)
+        return np.matmul(O_sys, O_data.T), msg
     # end axis_interpretation()
 
     def unit_conversion(self, group_id, param_id='UNITS', sys_unit=None):
@@ -403,22 +406,22 @@ class C3DParseDictionary:
         # Unit conversion dictionary
         unit_dict = {
             # Metric
-            'm':            1.0,
-            'meter':        1.0,
-            'cm':           1e-2,
-            'centimeter':   1e-2,
-            'mm':           1e-3,
-            'millimeter':   1e-3,
+            'm': 1.0,
+            'meter': 1.0,
+            'cm': 1e-2,
+            'centimeter': 1e-2,
+            'mm': 1e-3,
+            'millimeter': 1e-3,
             # Imperial
-            'in':           254e-4,
-            'inch':         254e-4,
-            'ft':           0.3048,
-            'foot':         0.3048,
-            'yd':           0.9144,
-            'yard':         0.9144,
+            'in': 254e-4,
+            'inch': 254e-4,
+            'ft': 0.3048,
+            'foot': 0.3048,
+            'yd': 0.9144,
+            'yard': 0.9144,
             # Default
-            None:           1.0
-            }
+            None: 1.0
+        }
         # Conversion factor (scale)
         conv_fac = 1.0
         # Convert data from unit defined in 'GROUP.UNITS'
@@ -460,7 +463,6 @@ class C3DParseDictionary:
         if not islist(param_ids):
             param_ids = [param_ids]
 
-
         def parseLabelParam(pid):
             glabels = self.parseParamString(group_id, pid)
             if islist(glabels):
@@ -478,17 +480,13 @@ class C3DParseDictionary:
             while plabel is not None:
                 # If labels were found, append.
                 labels.append(plabel)
-                plabel = parseLabelParam("%s%i"%(pid, i))
+                plabel = parseLabelParam("%s%i" % (pid, i))
                 i += 1
-
-
-        # Todo, sort Vicon point data.
 
         if len(labels) > 0:
             return np.concatenate(labels)
         else:
             return np.array([])
-
 
     def getPointChannelLabels(self, empty_label_prefix='EMPTY', missing_label_prefix='UNKNOWN'):
         ''' Determine a set of unique labels for POINT data channels.
@@ -519,7 +517,7 @@ class C3DParseDictionary:
 
         # Count duplicate labels
         unique_labels, indices, count = np.unique(labels, return_inverse=True, return_counts=True)
-        out_list = [None]*len(labels)
+        out_list = [None] * len(labels)
         counter = np.zeros(len(indices), np.int32)
         for i in range(len(indices)):
             index = indices[i]
@@ -531,7 +529,6 @@ class C3DParseDictionary:
                 label = '%s_%02i' % (label, counter[index])
             out_list[i] = label
         return np.array(out_list)
-
 
     def generateLabelMask(self, labels, group='POINT'):
         ''' Generate a mask for specified labels in accordance with common/software specific rules.
@@ -547,7 +544,6 @@ class C3DParseDictionary:
             return self.generateSoftwareLabelMask(dict, labels, group)
 
         return np.ones(np.shape(labels), dtype=np.bool)
-
 
     def generateSoftwareLabelMask(self, dict, labels, group='POINT'):
         ''' Generate a label mask in regard to the software used to generate the file.
@@ -585,7 +581,6 @@ class C3DParseDictionary:
 
         return mask
 
-
     def getSoftwareDictionary(self):
         ''' Fetch software specific dictionaries defining parameters used to
             manage specific software implementations.
@@ -598,10 +593,9 @@ class C3DParseDictionary:
         # No specific software matched
         return None
 
-
     def getViconDictionary():
         return {
-            'POINT_EXCLUDE':[[], [], ['ANGLES', 'FORCES', 'POWERS', 'MOMENTS']] # Equal, contain, parameter
+            'POINT_EXCLUDE': [[], [], ['ANGLES', 'FORCES', 'POWERS', 'MOMENTS']]  # Equal, contain, parameter
         }
 
     """
@@ -619,17 +613,17 @@ class C3DParseDictionary:
         ''' Basic dictionary
         '''
         return {
-            'USED':         C3DParseDictionary.parseParamInt,
-            'FRAMES':       C3DParseDictionary.parseParamAnyInteger,  # Try to convert to integer in any way
-            'DATA_START':   C3DParseDictionary.parseParamInt,
-            'SCALE':        C3DParseDictionary.parseParamFloat,
-            'RATE':         C3DParseDictionary.parseParamFloat,
+            'USED': C3DParseDictionary.parseParamInt,
+            'FRAMES': C3DParseDictionary.parseParamAnyInteger,  # Try to convert to integer in any way
+            'DATA_START': C3DParseDictionary.parseParamInt,
+            'SCALE': C3DParseDictionary.parseParamFloat,
+            'RATE': C3DParseDictionary.parseParamFloat,
             # 'MOVIE_DELAY':C3DParseDictionary.parseParamInt,
-            'MOVIE_ID':     C3DParseDictionary.parseParamString,
-            'X_SCREEN':     C3DParseDictionary.parseParamString,
-            'Y_SCREEN':     C3DParseDictionary.parseParamString,
-            'UNITS':        C3DParseDictionary.parseParamString,
-            'LABELS':       C3DParseDictionary.parseParamString,
+            'MOVIE_ID': C3DParseDictionary.parseParamString,
+            'X_SCREEN': C3DParseDictionary.parseParamString,
+            'Y_SCREEN': C3DParseDictionary.parseParamString,
+            'UNITS': C3DParseDictionary.parseParamString,
+            'LABELS': C3DParseDictionary.parseParamString,
             'DESCRIPTIONS': C3DParseDictionary.parseParamString,
             # Test cases stored START/END fields as as uint32 but in indicated 2 16 bit words..
             'ACTUAL_START_FIELD': C3DParseDictionary.parseParamUInt_32,
@@ -734,7 +728,7 @@ class C3DParseDictionary:
         for group in self.groups:
             print('')
             print('')
-            print("'"+group+"':")
+            print("'" + group + "':")
             print("------------------------------")
             self.printParameters(group)
         # end
