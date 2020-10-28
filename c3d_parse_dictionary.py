@@ -371,7 +371,7 @@ class C3DParseDictionary:
         axis_x = self.parseParamString('POINT', 'X_SCREEN')
         axis_y = self.parseParamString('POINT', 'Y_SCREEN')
         # If both X/Y_SCREEN axis can't be parsed, default case:
-        if not axis_x in AXIS_DICT or not axis_y in AXIS_DICT:
+        if axis_x not in AXIS_DICT or axis_y not in AXIS_DICT:
             axis_x = 'X'
             axis_y = 'Z'
             msg = 'Unable to parse X/Y_SCREEN information for POINT data, ' +\
