@@ -370,16 +370,19 @@ class C3DParseDictionary:
 
         axis_x = self.parseParamString('POINT', 'X_SCREEN')
         axis_y = self.parseParamString('POINT', 'Y_SCREEN')
-        # Interpret if both X/Y_SCREEN axis can be parsed
-        if axis_x in AXIS_DICT and axis_y in AXIS_DICT:
-            axis_x = AXIS_DICT[axis_x]
-            axis_y = AXIS_DICT[axis_y]
-            O_data[:, 0] = axis_x
-            O_data[:, 1] = axis_y
-            O_data[:, 2] = np.cross(axis_x, axis_y)
-        else:
+        # If both X/Y_SCREEN axis can't be parsed, default case:
+        if not axis_x in AXIS_DICT or not axis_y in AXIS_DICT:
+            axis_x = 'X'
+            axis_y = 'Z'
             msg = 'Unable to parse X/Y_SCREEN information for POINT data, ' +\
                   'manual adjustment to orientation may be necessary.'
+
+        # Interpret if both X/Y_SCREEN
+        axis_x = AXIS_DICT[axis_x]
+        axis_y = AXIS_DICT[axis_y]
+        O_data[:, 0] = axis_x
+        O_data[:, 1] = axis_y
+        O_data[:, 2] = np.cross(axis_x, axis_y)
 
         # Define the system third axis as the cross product:
         O_sys = np.empty((3, 3))
