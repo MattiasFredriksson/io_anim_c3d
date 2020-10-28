@@ -218,14 +218,17 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
                 if c3d_importer.load(self, context, filepath=path, **keywords) == {'FINISHED'}:
                     finished += 1
 
-            if finished < len(self.files):
+            # Generate errors if errors occured
+            if finished == 0:
+                self.report({'ERROR'}, 'Failed loading .c3d file(s)')
+            elif finished < len(self.files):
                 self.report({'WARNING'}, 'Failed to load %i of %i files' %
-                            (len(self.files) - finished), len(self.files))
+                            (len(self.files) - finished, len(self.files)))
 
             if finished > 0:
                 return {'FINISHED'}
             else:
-                return {'ERROR'}
+                return {'CANCELLED'}
         else:
             return c3d_importer.load(self, context, filepath=self.filepath, **keywords)
 
