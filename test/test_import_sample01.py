@@ -1,11 +1,6 @@
 import bpy
-import glob
 import os
 import unittest
-
-#import_dir = "C:\\Projects\\Code\\Blender\\Addons\\io_anim_c3d\\ignore"
-#files = glob.glob("*.c3d")
-
 
 
 class ImportC3DTestSample01(unittest.TestCase):
@@ -21,7 +16,8 @@ class ImportC3DTestSample01(unittest.TestCase):
         # Parse files
         for file in FILES:
             # Parse
-            bpy.ops.import_anim.c3d(filepath=os.path.join(IMPORT_DIR, file), print_file=False, load_mem_efficient=True, include_empty_labels=False)
+            bpy.ops.import_anim.c3d(filepath=os.path.join(IMPORT_DIR, file),
+                                    print_file=False, load_mem_efficient=True, include_empty_labels=False)
             # Fetch loaded objects
             obj = bpy.context.selected_objects[0]
             objs.append(obj)
@@ -48,9 +44,9 @@ class ImportC3DTestSample01(unittest.TestCase):
     def test_C_tracker_labels(self):
         ''' Verify data labels match assigned channel group names
         '''
-        LABELS = ['RFT1', 'RFT2', 'RFT3', 'LFT1', 'LFT2', 'LFT3', 'RSK1', 'RSK2', 'RSK3', 'RSK4',
-            'LSK1', 'LSK2', 'LSK3', 'LSK4', 'RTH1', 'RTH2', 'RTH3', 'RTH4', 'LTH1', 'LTH2', 'LTH3', 'LTH4',
-            'PV1', 'PV2', 'PV3', 'pv4']#, 'TR2', 'TR3', 'RA', 'LA', 'RK', 'LK', 'RH', 'LH', 'RPP', 'LPP', 'RS', 'LS']
+        LABELS = ['RFT1', 'RFT2', 'RFT3', 'LFT1', 'LFT2', 'LFT3', 'RSK1', 'RSK2', 'RSK3', 'RSK4', 'LSK1', 'LSK2',
+                  'LSK3', 'LSK4', 'RTH1', 'RTH2', 'RTH3', 'RTH4', 'LTH1', 'LTH2', 'LTH3', 'LTH4', 'PV1', 'PV2', 'PV3',
+                  'pv4']  # , 'TR2', 'TR3', 'RA', 'LA', 'RK', 'LK', 'RH', 'LH', 'RPP', 'LPP', 'RS', 'LS']
 
         for action in self.actions:
             names = [fc_grp.name for fc_grp in action.groups]
@@ -64,7 +60,6 @@ class ImportC3DTestSample01(unittest.TestCase):
         for action in self.actions[1:]:
             for i in range(len(a0.fcurves)):
                 self.assertEqual(len(a0.fcurves[i].keyframe_points), len(action.fcurves[i].keyframe_points))
-
 
     def test_E_keyframes_equal(self):
         ''' Verify keyframes are identical

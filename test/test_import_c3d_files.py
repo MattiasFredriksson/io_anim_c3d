@@ -3,16 +3,11 @@ import glob
 import os
 import unittest
 
-#import_dir = "C:\\Projects\\Code\\Blender\\Addons\\io_anim_c3d\\ignore"
-#files = glob.glob("*.c3d")
-
-
 
 class ImportC3DTestMultipleFiles(unittest.TestCase):
 
     def setUpClass():
         IMPORT_DIR = "C:\\Projects\\Code\\Blender\\Addons\\io_anim_c3d\\test\\testfiles\\sample00"
-        IMPORT_DIR = "C:\\Projects\\Code\\Blender\\Addons\\io_anim_c3d\\test\\testfiles\\sample00\\Vicon Motion Systems"
         os.chdir(IMPORT_DIR)
         FILES = glob.glob("*.c3d")
         # Recurse one directory
@@ -40,7 +35,6 @@ class ImportC3DTestMultipleFiles(unittest.TestCase):
         '''
         for action in self.actions:
             self.assertGreater(len(action.fcurves), 0)
-
 
     def test_B_keyframe_count(self):
         ''' Verify each channel has keyframes

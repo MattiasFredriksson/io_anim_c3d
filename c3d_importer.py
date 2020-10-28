@@ -61,6 +61,9 @@ def load(operator, context, filepath="",
     parser = C3DParseDictionary(filepath)
     if print_file:
         parser.printFile()
+    if parser.reader.point_used == 0:
+        operator.report({'WARNING'}, 'No POINT data in file: %s' % filepath)
+        return {'CANCELLED'}
 
     # Frame rate conversion factor
     conv_fac_frame_rate = 1.0
@@ -93,6 +96,9 @@ def load(operator, context, filepath="",
     labels = C3DParseDictionary.generateUniqueLabels(labels[point_mask])
     # Equivalent to number of channels used in POINT data
     nlabels = len(labels)
+    if nlabels == 0:
+        operator.report({'WARNING'}, 'All POINT data was culled in file: %s' % filepath)
+        return {'CANCELLED'}
 
     # Number of frames [first, last] => +1
     # first_frame is the frame index to start parsing from
@@ -128,6 +134,12 @@ def load(operator, context, filepath="",
     for fc in action.fcurves:
         fc.update()
 
+
+    if action.fcurves == 0:
+        remove_action(action)
+        # All samples were either invalid or was previously culled in regard to the channel label.
+        operator.report({'WARNING'}, 'No valid POINT data in file: %s' % filepath)
+        return {'CANCELLED'}
 
 
     # Create an armature adapted to the data (if specified)
@@ -284,6 +296,11 @@ def create_action(action_name, object=None, fake_user=False):
     if object:
         set_action(object, action, replace=False)
     return action
+
+def remove_action(action):
+    ''' Delete a specific action.
+    '''
+    bpy.data.actions.remove(action)
 
 
 def set_action(object, action, replace=True):
