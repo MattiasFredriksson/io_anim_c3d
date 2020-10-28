@@ -370,7 +370,7 @@ class C3DParseDictionary:
 
         axis_x = self.parseParamString('POINT', 'X_SCREEN')
         axis_y = self.parseParamString('POINT', 'Y_SCREEN')
-        # Convert
+        # Interpret if both X/Y_SCREEN axis can be parsed
         if axis_x in AXIS_DICT and axis_y in AXIS_DICT:
             axis_x = AXIS_DICT[axis_x]
             axis_y = AXIS_DICT[axis_y]
