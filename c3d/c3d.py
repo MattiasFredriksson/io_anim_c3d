@@ -7,7 +7,7 @@ import io
 import numpy as np
 import struct
 import warnings
-
+import codecs
 
 PROCESSOR_INTEL = 84
 PROCESSOR_DEC = 85
@@ -15,11 +15,13 @@ PROCESSOR_MIPS = 86
 
 
 class DataTypes(object):
-    ''' Define the data types used for reading parameter data.
+    ''' Container defining different data types used for reading file data.
+        Data types depend on the processor format the file is stored in.
     '''
     def __init__(self, proc_type):
+        self.proc_type = proc_type
         if proc_type == PROCESSOR_MIPS:
-            # Big-Endian
+            # Big-Endian (SGI/MIPS format)
             self.float32 = np.dtype(np.float32).newbyteorder('>')
             self.float64 = np.dtype(np.float64).newbyteorder('>')
             self.uint8 = np.uint8
@@ -31,6 +33,7 @@ class DataTypes(object):
             self.int32 = np.dtype(np.int32).newbyteorder('>')
             self.int64 = np.dtype(np.int64).newbyteorder('>')
         else:
+            # Little-Endian format (Intel or DEC format)
             self.float32 = np.float32
             self.float64 = np.float64
             self.uint8 = np.uint8
@@ -42,6 +45,24 @@ class DataTypes(object):
             self.int32 = np.int32
             self.int64 = np.int64
 
+    @property
+    def isIEEE(self):
+        ''' True if the associated file is in the Intel format.
+        '''
+        return self.proc_type == PROCESSOR_INTEL
+
+    @property
+    def isDEC(self):
+        ''' True if the associated file is in the DEC format.
+        '''
+        return self.proc_type == PROCESSOR_DEC
+
+    @property
+    def isMIPS(self):
+        ''' True if the associated file is in the SGI/MIPS format.
+        '''
+        return self.proc_type == PROCESSOR_MIPS
+
     def decode_string(self, bytes):
         ''' Decode a byte array to a string.
         '''
@@ -49,11 +70,11 @@ class DataTypes(object):
         decoders =  ['utf-8', 'latin-1']
         for dec in decoders:
             try:
-                return bytes.decode(dec)
+                return codecs.decode(bytes, dec)
             except UnicodeDecodeError:
                 continue
         # Revert to using default decoder but replace characters
-        return bytes.decode(decoders[0], 'replace')
+        return codecs.decode(bytes, decoders[0], 'replace')
 
 
 def UNPACK_FLOAT_IEEE(uint_32):
@@ -477,6 +498,8 @@ class Param(object):
     ----------
     name : str
         Name of this parameter.
+    dtype: DataTypes
+        Reference to the DataTypes object associated with the file.
     desc : str
         Brief description of this parameter.
     bytes_per_element : int, optional
@@ -489,12 +512,13 @@ class Param(object):
         rows (number of strings).
     bytes : str
         Raw data for this parameter.
+    handle :
+        File handle positioned at the first byte of a .c3d parameter description.
     '''
 
     def __init__(self,
                  name,
                  dtype,
-                 proc=PROCESSOR_INTEL,
                  desc='',
                  bytes_per_element=1,
                  dimensions=None,
@@ -502,7 +526,6 @@ class Param(object):
                  handle=None):
         '''Set up a new parameter, only the name is required.'''
         self.name = name
-        self.proc = proc
         self.dtype = dtype
         self.desc = desc
         self.bytes_per_element = bytes_per_element
@@ -513,15 +536,6 @@ class Param(object):
 
     def __repr__(self):
         return '<Param: {}>'.format(self.desc)
-    @property
-    def isIEEE(self):
-        return self.proc == PROCESSOR_INTEL
-    @property
-    def isDEC(self):
-        return self.proc == PROCESSOR_DEC
-    @property
-    def isMIPS(self):
-        return self.proc == PROCESSOR_MIPS
     @property
     def num_elements(self):
         '''Return the number of elements in this parameter's array value.'''
@@ -596,7 +610,8 @@ class Param(object):
         assert self.dimensions, \
             '{}: cannot get value as {} array!'.format(self.name, dtype)
         elems = np.frombuffer(self.bytes, dtype=dtype)
-        return elems.reshape(self.dimensions[::-1]) # Reverse shape as data is stored in fortran format
+        # Reverse shape as the shape is defined in fortran format
+        return elems.reshape(self.dimensions[::-1])
 
     def _as_any(self, dtype):
         '''Unpack the raw bytes of this param as either array or single value.'''
@@ -667,7 +682,7 @@ class Param(object):
     @property
     def float_value(self):
         '''Get the param as a 32-bit float.'''
-        if self.isDEC:
+        if self.dtype.isDEC:
             return DEC_to_IEEE(self._as(np.uint32))
         else:  # isMIPS or isIEEE
             return self._as(self.dtype.float32)
@@ -716,7 +731,7 @@ class Param(object):
     def float_array(self):
         '''Get the param as an array of 32-bit floats.'''
         # Convert float data if not IEEE processor
-        if self.isDEC:
+        if self.dtype.isDEC:
             # _as_array but for DEC
             assert self.dimensions, \
                 '{}: cannot get value as {} array!'.format(self.name, dtype)
@@ -727,32 +742,22 @@ class Param(object):
     @property
     def bytes_array(self):
         '''Get the param as an array of raw byte strings.'''
-        def recurse_read(arr, inds, dim):
-            ''' Decode parameter bytes in fortran format and read into a C ordered array.
-            '''
-            if dim < 0:
-                # Calculate byte offset for the value, the sum of all indices times the byte step of each dimension.
-                off = np.sum(np.multiply(inds, np.cumprod(self.dimensions[:-1])))
-                # Decode the bytes, insert at the reverted fortran index
-                arr[tuple(inds[::-1])] = self.bytes[off:off+self.dimensions[0]]
-            else:
-                # Recurse until a single string can be parsed.
-                for i in range(self.dimensions[dim]):
-                    inds[dim - 1] = i
-                    recurse_read(arr, inds, dim - 1)
         # Decode different dimensions
         if len(self.dimensions) == 0:
             return np.array([])
         elif len(self.dimensions) == 1:
-            return self.bytes.copy()
+            return np.array(self.bytes)
         else:
-            byte_arr = np.empty(self.dimensions[:0:-1], dtype=object)
-            byte_steps =  np.cumprod(self.dimensions[:-1])
-            for i in np.ndindex(byte_arr.shape):
+            # Convert Fortran shape (data in memory is identical, shape is transposed)
+            word_len = self.dimensions[0]
+            dims = self.dimensions[1:][::-1] # Identical to: [:0:-1]
+            byte_steps =  np.cumprod(self.dimensions[:-1])[::-1]
+            # Generate mult-dimensional array and parse byte words
+            byte_arr = np.empty(dims, dtype=object)
+            for i in np.ndindex(*dims):
                 # Calculate byte offset as sum of each array index times the byte step of each dimension.
-                # Use the reverted C index to get fortran indexing.
-                off = np.sum(np.multiply(i[::-1], byte_steps))
-                byte_arr[i] = self.bytes[off:off+self.dimensions[0]]
+                off = np.sum(np.multiply(i, byte_steps))
+                byte_arr[i] = self.bytes[off:off+word_len]
             return byte_arr
 
     @property
@@ -934,7 +939,7 @@ class Manager(object):
             ratio = self.analog_rate / self.point_rate
         else:
             ratio = 0
-        assert True or self.header.analog_per_frame == ratio, (
+        assert self.header.analog_per_frame == ratio, (
             'inconsistent analog rate! {} header != {} analog-fps / {} point-fps'.format(
                 self.header.analog_per_frame,
                 self.analog_rate,
@@ -942,7 +947,7 @@ class Manager(object):
             ))
 
         count = self.analog_used * self.header.analog_per_frame
-        assert True or self.header.analog_count == count, (
+        assert self.header.analog_count == count, (
             'inconsistent analog count! {} header != {} analog used * {} per-frame'.format(
                 self.header.analog_count,
                 self.analog_used,
@@ -1114,12 +1119,12 @@ class Manager(object):
 
     @property
     def analog_rate(self):
-        '''  Total number of analog data samples per 3D frame (point sample).
+        '''  Number of analog data samples per second.
         '''
         try:
             return self.get_float('ANALOG:RATE')
         except AttributeError:
-            return 0
+            return self.header.analog_per_frame * self.point_rate
 
     @property
     def analog_per_frame(self):
@@ -1256,7 +1261,7 @@ class Reader(Manager):
                 # we've just started reading a parameter. if its group doesn't
                 # exist, create a blank one. add the parameter to the group.
                 self.groups.setdefault(
-                    group_id, Group()).add_param(name, self.dtypes, handle=buf, proc=self.processor)
+                    group_id, Group()).add_param(name, self.dtypes, handle=buf)
             else:
                 # we've just started reading a group. if a group with the
                 # appropriate id exists already (because we've already created
@@ -1503,6 +1508,7 @@ class Writer(Manager):
         super(Writer, self).__init__()
         self._point_rate = point_rate
         self._analog_rate = analog_rate
+        self._analog_per_frame = analog_rate / point_rate
         self._point_scale = point_scale
         self._point_units = point_units
         self._gen_scale = gen_scale
@@ -1626,7 +1632,7 @@ class Writer(Manager):
 
         points, analog = self._frames[0]
         ppf = len(points)
-        labels = np.ravel(labels, order='F')
+        labels = np.ravel(labels)
 
         # POINT group
 
@@ -1638,8 +1644,8 @@ class Writer(Manager):
         add('USED', 'Number of 3d markers', 2, '<H', ppf)
         add('FRAMES', 'frame count', 2, '<H', min(65535, len(self._frames)))
         add('DATA_START', 'data block number', 2, '<H', 0)
-        add('SCALE', '3d scale factor', 4, '<f', self._point_scale)
-        add('RATE', '3d data capture rate', 4, '<f', self._point_rate)
+        add('SCALE', '3d scale factor', 4, '<f', np.float32(self._point_scale))
+        add('RATE', '3d data capture rate', 4, '<f', np.float32(self._point_rate))
         add_str('X_SCREEN', 'X_SCREEN parameter', '+X', 2)
         add_str('Y_SCREEN', 'Y_SCREEN parameter', '+Y', 2)
         add_str('UNITS', '3d data units',
@@ -1652,8 +1658,8 @@ class Writer(Manager):
         # ANALOG group
         group = self.add_group(2, 'ANALOG', 'ANALOG group')
         add('USED', 'analog channel count', 2, '<H', analog.shape[0])
-        add('RATE', 'analog samples per 3d frame', 4, '<f', analog.shape[1])
-        add('GEN_SCALE', 'analog general scale factor', 4, '<f', self._gen_scale)
+        add('RATE', 'analog samples per second', 4, '<f', np.float32(self._analog_rate))
+        add('GEN_SCALE', 'analog general scale factor', 4, '<f', np.float32(self._gen_scale))
         add_empty_array('SCALE', 'analog channel scale factors', 4)
         add_empty_array('OFFSET', 'analog channel offsets', 2)
 
@@ -1666,13 +1672,13 @@ class Writer(Manager):
         blocks = self.parameter_blocks()
         self.get('POINT:DATA_START').bytes = struct.pack('<H', 2 + blocks)
 
-        self.header.data_block = 2 + blocks
-        self.header.frame_rate = self._point_rate
-        self.header.last_frame = min(len(self._frames), 65535)
-        self.header.point_count = ppf
-        self.header.analog_count = np.prod(analog.shape)
-        self.header.analog_per_frame = analog.shape[0]
-        self.header.scale_factor = self._point_scale
+        self.header.data_block = np.uint16(2 + blocks)
+        self.header.frame_rate = np.float32(self._point_rate)
+        self.header.last_frame = np.uint16(min(len(self._frames), 65535))
+        self.header.point_count = np.uint16(ppf)
+        self.header.analog_count = np.uint16(np.prod(analog.shape))
+        self.header.analog_per_frame = np.uint16(self._analog_per_frame)
+        self.header.scale_factor = np.float32(self._point_scale)
 
         self._write_metadata(handle)
         self._write_frames(handle)

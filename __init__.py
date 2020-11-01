@@ -100,7 +100,8 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
 
     use_manual_orientation: BoolProperty(
         name="Manual Orientation",
-        description="Specify orientation manually rather then use interpretations from embedded data",
+        description="""Specify orientation manually rather then use interpretations from embedded data.
+                    Setting overrides default orientation behavior""",
         default=False,
     )
 
