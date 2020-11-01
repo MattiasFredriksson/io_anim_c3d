@@ -87,6 +87,10 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     bl_label = "Import C3D"
     bl_options = {'UNDO', 'PRESET'}
 
+
+    # -----
+    # Parameters received from the file selection and ImportHelper
+    # -----
     directory: StringProperty()
 
     # File extesion specification and filter
@@ -99,45 +103,22 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
         type=bpy.types.OperatorFileListElement,
     )
 
-    use_manual_orientation: BoolProperty(
-        name="Manual Orientation",
-        description="Specify orientation manually rather then use interpretations from embedded data. " +
-                    "Setting overrides default orientation behavior",
-        default=False,
-    )
-
-    global_scale: FloatProperty(
-        name="Scale",
-        description="Scaling factor applied to geometric (spatial) data, multiplied with other (embedded) factors",
-        min=0.001, max=1000.0,
-        default=1.0,
-    )
-
-    create_armature: BoolProperty(
-        name="Create Armature",
-        description="Generate an armature to display the animated point cloud",
-        default=True,
-    )
-
-    bone_size: FloatProperty(
-        name="Marker Size", default=0.02,
-        description="Define the width of each marker bone",
-        min=0.001, max=10.0,
-        soft_min=0.01, soft_max=1.0,
-    )
-
-    # Scale frame rate to match blender frame rate.
-    # This does not reduce the number of keyframes (keyframe reduction through interpolation would be useful)
+    # -----
+    # Primary import settings
+    # -----
+    # Setting for scaling frame rate to match blender frame rate.
+    # This does not reduce the number of keyframes. Keyframe reduction through interpolation might be useful to
+    # both simplify loaded data and improve performance (keyframe insertion is slow)...
     adapt_frame_rate: BoolProperty(
         name="Convert Frame Rate",
-        description="Scale sample frame rate to the current Blender frame rate. " +
-                    "If False keyframes will be inserted at 1 frame increments",
+        description="Convert the frame rate for data samples to the current Blender frame rate. " +
+                    "If the setting is set to False keyframes will be inserted at 1 frame increments",
         default=True,
     )
 
     fake_user: BoolProperty(
         name="Fake User",
-        description="True to set the fake user flag for generated action sequence(s)",
+        description="If True set the fake user flag for the generated action sequence(s)",
         default=True,
     )
 
@@ -164,6 +145,14 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
         default='LINEAR'
     )
 
+    min_camera_count: IntProperty(
+        name="Min. camera count",
+        description="Minimum number of cameras recording a marker for it to be considered a valid recording " +
+                    "(non-occluded).. Note that NOT all files record visibility counters",
+        min=0, max=10,
+        default=0,
+    )
+
     # It should be noted that the standard states two custom representations:
     # 0:  'indicates that the 3D point coordinate is the result of modeling
     #      calculations, interpolation, or filtering'
@@ -174,14 +163,6 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
                     "samples will be included. Note that NOT all files record marker residuals",
         min=0., max=1000000.0,
         soft_min=0., soft_max=100.0,
-    )
-
-    min_camera_count: IntProperty(
-        name="Min. camera count",
-        description="Minimum number of cameras recording a marker for it to be considered a valid recording " +
-                    "(non-occluded).. Note that NOT all files record visibility counters",
-        min=0, max=10,
-        default=0,
     )
 
     include_event_markers: BoolProperty(
@@ -197,6 +178,42 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
         default=False,
     )
 
+    # -----
+    # Armature settings
+    # -----
+    create_armature: BoolProperty(
+        name="Create Armature",
+        description="Generate an armature to display the animated point cloud",
+        default=True,
+    )
+
+    bone_size: FloatProperty(
+        name="Marker Size", default=0.02,
+        description="Define the width of each marker bone",
+        min=0.001, max=10.0,
+        soft_min=0.01, soft_max=1.0,
+    )
+
+    # -----
+    # Transformation settings (included to allow manual modification of spatial data in the loading process)
+    # -----
+    use_manual_orientation: BoolProperty(
+        name="Manual Orientation",
+        description="Specify orientation manually rather then use interpretations from embedded data. " +
+                    "Setting overrides the default orientation behavior",
+        default=False,
+    )
+
+    global_scale: FloatProperty(
+        name="Scale",
+        description="Scaling factor applied to geometric (spatial) data, multiplied with other (embedded) factors",
+        min=0.001, max=1000.0,
+        default=1.0,
+    )
+
+    # -----
+    # Debug settings
+    # -----
     print_file: BoolProperty(
         name="Print File Information",
         description="Print file and parameter headers to console",
