@@ -146,7 +146,7 @@ def load(operator, context, filepath="",
     arm_obj = None
     bone_radius = bone_size * 0.5
     if create_armature:
-        final_labels = [fc.group.name for fc in action.fcurves]
+        final_labels = [fc_grp.name for fc_grp in action.groups]
         arm_obj = create_armature_object(context, file_name, 'BBONE')
         add_empty_armature_bones(context, arm_obj, final_labels, bone_size)
         # Set the width of the bbones
