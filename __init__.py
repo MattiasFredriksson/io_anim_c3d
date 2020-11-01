@@ -183,6 +183,13 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
         default=0,
     )
 
+    include_event_markers: BoolProperty(
+        name="Include event markers",
+        description="Add recorded events as 'pose markers' to the action sequence. To view 'pose markers' the " +
+                    "setting Marker > Show Pose Markers must be enabled in the Action Editor",
+        default=False,
+    )
+
     include_empty_labels: BoolProperty(
         name="Include empty labels",
         description="Create channels for labels with no valid keyframes",
@@ -264,6 +271,7 @@ class C3D_PT_action(bpy.types.Panel):
         layout.prop(operator, "interpolation")
         layout.prop(operator, "min_camera_count")
         layout.prop(operator, "max_residual")
+        layout.prop(operator, "include_event_markers")
         layout.prop(operator, "include_empty_labels")
 
 

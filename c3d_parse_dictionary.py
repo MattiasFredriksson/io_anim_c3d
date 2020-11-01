@@ -145,6 +145,8 @@ class C3DParseDictionary:
         return group.get(param_id, None)    # Fetch param or return None if not found
 
     def getParamNames(self, group_id):
+        ''' Get an iterable over parameter group names.
+        '''
         group = self.getGroup(group_id) 		 # Fetch group
         if group is None:						 # Verify fetch
             return None
@@ -152,7 +154,7 @@ class C3DParseDictionary:
 
     """
     --------------------------------------------------------
-                        Byte Parsing functions
+                        Parameter parsing functions
     --------------------------------------------------------
     """
 
@@ -344,6 +346,49 @@ class C3DParseDictionary:
     --------------------------------------------------------
     """
 
+    def getHeaderEvents(self):
+        ''' Get an iterable over header events. Each item is on the form (frame_timing, label) and type (float, string).
+        '''
+        header = self.reader.header
+        # Convert event timing to a frame index (in floating point)
+        timings = header.event_timings[header.event_disp_flags] * self.reader.point_rate - self.reader.first_frame
+        return zip(timings, header.event_labels[header.event_disp_flags])
+
+    def getEvents(self):
+        ''' Get an iterable over EVENTS defined in the file.
+        '''
+        if self.getParam('EVENT', 'LABELS') == None:
+            return self.getHeaderEvents()
+        else:
+            ecount = int(self.parseParamAny('EVENT', 'USED'))
+            labels = self.parseLabels('EVENT', 'LABELS')
+            context = self.parseLabels('EVENT', 'CONTEXTS')
+            timings = self.parseMultiParameter('EVENT', 'TIMES', C3DParseDictionary.parseParamFloat)
+
+            tshape = np.shape(timings)
+            if ecount > len(labels):
+                raise ValueError('C3D events could not be parsed. Expected %i labels found %i.' % (ecount, len(labels)))
+            elif ecount > tshape[-1]:
+                raise ValueError('C3D events could not be parsed. Expected %i timings found %i.' % (ecount, tshape[-1]))
+
+            # Parse timing parameter, the parameter can contain two columns tracking
+            # minutes and seconds separately. If only one column is present it's assumed
+            # to be recorded in seconds.
+            if len(tshape) == 2 and tshape[0] == 2:
+                frame_timings = timings[:, 0] * 60.0 * self.reader.point_rate
+                frame_timings += timings[:, 1] * self.reader.point_rate - self.reader.first_frame
+            elif len(tshape) == 1:
+                frame_timings = timings * self.reader.point_rate - self.reader.first_frame
+            else:
+                raise ValueError(
+                    'C3D events could not be parsed. Shape %s for the EVENT.TIMES parameter is not supported.' %\
+                    np.shape(timings))
+
+            # Combine label array with label context and return
+            if context is not None:
+                labels = labels + '_' + context
+            return zip(frame_timings, labels)
+
     def axis_interpretation(self, sys_axis_up=[0, 0, 1], sys_axis_forw=[0, 1, 0]):
         ''' Interpret X_SCREEN and Y_SCREEN parameters as the axis orientation for the system.
 
@@ -453,6 +498,44 @@ class C3DParseDictionary:
         # Return the conversion factor
         return conv_fac
 
+    def parseMultiParameter(self, group_id, param_ids, pfunction='C3DParseDictionary.parseParamAny'):
+        ''' Get concatenated list of values for a group parameter stored in multiple entries.
+
+        Params:
+        ----
+        group_id:   Group from which the labels should be parsed.
+        param_ids:  List of parameter identifiers for which label information is stored, e.g. ['LABELS'].
+        pfunction:  Function used to parse the group parameter, default is parseParamAny(...).
+        Returns:    Numpy array containing parsed values.
+        '''
+        if not islist(param_ids):
+            param_ids = [param_ids]
+
+        def parseParam(pid):
+            pitems = pfunction(self, group_id, pid)
+            if islist(pitems):
+                return pitems
+            elif pitems is not None:
+                return [pitems]
+            return None
+
+        items = []
+        for pid in param_ids:
+            # Base case, first label parameter.
+            pitems = parseParam(pid)
+            # Repeat checking for extended label parameters until none is found.
+            i = 2
+            while pitems is not None:
+                # If any values were parsed, append.
+                items.append(pitems)
+                pitems = parseParam("%s%i" % (pid, i))
+                i += 1
+
+        if len(items) > 0:
+            return np.concatenate(items)
+        else:
+            return np.array([])
+
     def parseLabels(self, group_id, param_ids=['LABELS']):
         ''' Get a list of labels from a group.
 
@@ -461,35 +544,9 @@ class C3DParseDictionary:
         group_id:   Group from which the labels should be parsed.
         param_ids:  List of parameter identifiers for which label information is stored, default is: ['LABELS'].
                     Note that all label parameters will be checked for extended formats such as
-        Returns:    Numpy list of label strings.
+        Returns:    Numpy array of label strings.
         '''
-        if not islist(param_ids):
-            param_ids = [param_ids]
-
-        def parseLabelParam(pid):
-            glabels = self.parseParamString(group_id, pid)
-            if islist(glabels):
-                return glabels
-            elif glabels is not None:  # is string
-                return [glabels]
-            return None
-
-        labels = []
-        for pid in param_ids:
-            # Base case, first label parameter.
-            plabel = parseLabelParam(pid)
-            # Repeat checking for extended label parameters until none is found.
-            i = 2
-            while plabel is not None:
-                # If labels were found, append.
-                labels.append(plabel)
-                plabel = parseLabelParam("%s%i" % (pid, i))
-                i += 1
-
-        if len(labels) > 0:
-            return np.concatenate(labels)
-        else:
-            return np.array([])
+        return self.parseMultiParameter(group_id, param_ids, C3DParseDictionary.parseParamString)
 
     def getPointChannelLabels(self, empty_label_prefix='EMPTY', missing_label_prefix='UNKNOWN'):
         ''' Determine a set of unique labels for POINT data channels.

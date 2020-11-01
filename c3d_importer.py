@@ -40,6 +40,7 @@ def load(operator, context, filepath="",
          interpolation='LINEAR',
          min_camera_count=0,
          max_residual=0.0,
+         include_event_markers=False,
          include_empty_labels=False,
          apply_label_mask=True,
          load_mem_efficient=False,
@@ -135,12 +136,15 @@ def load(operator, context, filepath="",
     # Since we inserted our keyframes in 'FAST' mode, we have to update the fcurves now.
     for fc in action.fcurves:
         fc.update()
-
     if action.fcurves == 0:
         remove_action(action)
         # All samples were either invalid or was previously culled in regard to the channel label.
         operator.report({'WARNING'}, 'No valid POINT data in file: %s' % filepath)
         return {'CANCELLED'}
+
+    # Parse events in the file as
+    if include_event_markers:
+        read_events(operator, parser, action, conv_fac_frame_rate)
 
     # Create an armature adapted to the data (if specified)
     arm_obj = None
@@ -160,6 +164,17 @@ def load(operator, context, filepath="",
 
     bpy.context.view_layer.update()
     return {'FINISHED'}
+
+
+def read_events(operator, parser, action, conv_fac_frame_rate):
+    ''' Read events from the loaded c3d file and add them as 'pose_markers' to the action.
+    '''
+    try:
+        for (frame, label) in parser.getEvents():
+            marker = action.pose_markers.new(label)
+            marker.frame = int(np.round(frame * conv_fac_frame_rate))
+    except ValueError as e:
+        operator.report({'WARNING'}, str(e))
 
 
 def valid_points(point_block, min_camera_count, max_residual):
