@@ -81,7 +81,8 @@ from bpy_extras.io_utils import (
 
 @orientation_helper(axis_forward='-Z', axis_up='Y')
 class ImportC3D(bpy.types.Operator, ImportHelper):
-    """Load a C3D file"""
+    """Load a C3D file
+    """
     bl_idname = "import_anim.c3d"
     bl_label = "Import C3D"
     bl_options = {'UNDO', 'PRESET'}
@@ -100,8 +101,8 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
 
     use_manual_orientation: BoolProperty(
         name="Manual Orientation",
-        description="""Specify orientation manually rather then use interpretations from embedded data.
-                    Setting overrides default orientation behavior""",
+        description="Specify orientation manually rather then use interpretations from embedded data. " +
+                    "Setting overrides default orientation behavior",
         default=False,
     )
 
@@ -129,8 +130,8 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     # This does not reduce the number of keyframes (keyframe reduction through interpolation would be useful)
     adapt_frame_rate: BoolProperty(
         name="Convert Frame Rate",
-        description="""Scale sample frame rate to the current Blender frame rate.
-                        If False keyframes will be inserted at 1 frame increments""",
+        description="Scale sample frame rate to the current Blender frame rate. " +
+                    "If False keyframes will be inserted at 1 frame increments",
         default=True,
     )
 
@@ -169,16 +170,16 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     # -1: 'is used to indicate that a point is invalid'
     max_residual: FloatProperty(
         name="Maximum Residual", default=0.0,
-        description="""Ignore data samples with a residual greater then specified value. If value is equal to 0 all
-                       samples will be included. Note that NOT all files record marker residuals""",
+        description="Ignore data samples with a residual greater then specified value. If value is equal to 0 all " +
+                    "samples will be included. Note that NOT all files record marker residuals",
         min=0., max=1000000.0,
         soft_min=0., soft_max=100.0,
     )
 
     min_camera_count: IntProperty(
         name="Min. camera count",
-        description="""Minimum number of cameras recording a marker for it to be considered a valid recording
-                       (non-occluded).. Note that NOT all files record visibility counters""",
+        description="Minimum number of cameras recording a marker for it to be considered a valid recording " +
+                    "(non-occluded).. Note that NOT all files record visibility counters",
         min=0, max=10,
         default=0,
     )
@@ -204,8 +205,8 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
 
     load_mem_efficient: BoolProperty(
         name="Memory Efficient",
-        description="""Reduce memory footprint of the import process at the cost of ~40 times
-                        longer processing time""",
+        description="Reduce memory footprint of the import process at the cost of ~40 times " +
+                    "longer processing time",
         default=False,
     )
 
