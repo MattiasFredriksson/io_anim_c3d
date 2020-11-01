@@ -111,22 +111,36 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     # both simplify loaded data and improve performance (keyframe insertion is slow)...
     adapt_frame_rate: BoolProperty(
         name="Convert Frame Rate",
-        description="Convert the frame rate for data samples to the current Blender frame rate. " +
-                    "If the setting is set to False keyframes will be inserted at 1 frame increments",
+        description="Convert the sample rate to match the current Blender frame rate. " +
+                    "If set to False keyframes will be inserted at 1 frame increments",
         default=True,
     )
 
     fake_user: BoolProperty(
         name="Fake User",
-        description="If True set the fake user flag for the generated action sequence(s)",
+        description="Set the fake user flag for imported action sequence(s) " +
+                    "(fake user flag ensures imported sequences will be saved in the .blend file)",
+        default=False,
+    )
+
+    include_event_markers: BoolProperty(
+        name="Include event markers",
+        description="Add labeled events as 'pose markers' to the action sequence. To be able to view the markers " +
+                    "the setting Marker > Show Pose Markers must be enabled in the Action Editor",
         default=True,
+    )
+
+    include_empty_labels: BoolProperty(
+        name="Include empty labels",
+        description="Create animation channels and armature bones for labeled point data without any valid keyframes",
+        default=False,
     )
 
     # Interpolation settings (link below), there is such thing as to many settings so ignored ones
     # seemingly redundant.
     # https://docs.blender.org/api/current/bpy.types.Keyframe.html#bpy.types.Keyframe.interpolation
     interpolation: EnumProperty(items=(
-        ('CONSTANT', "Constant", "Constant, No interpolation"),
+        ('CONSTANT', "Constant", "Constant (or no interpolation)"),
         ('LINEAR', "Linear", "Linear interpolation"),
         ('BEZIER', "Bezier", "Smooth interpolation between A and B, with some control over curve shape"),
         # ('SINE', "Sinusoidal", "Sinusoidal easing (weakest, almost linear but with a slight curvature)"),
@@ -147,8 +161,8 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
 
     min_camera_count: IntProperty(
         name="Min. camera count",
-        description="Minimum number of cameras recording a marker for it to be considered a valid recording " +
-                    "(non-occluded).. Note that NOT all files record visibility counters",
+        description="Minimum number of camera visibility flags required for a marker recording to be considered " +
+                    "valid (non-occluded). Note that not all files record visibility counters",
         min=0, max=10,
         default=0,
     )
@@ -159,23 +173,10 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     # -1: 'is used to indicate that a point is invalid'
     max_residual: FloatProperty(
         name="Maximum Residual", default=0.0,
-        description="Ignore data samples with a residual greater then specified value. If value is equal to 0 all " +
-                    "samples will be included. Note that NOT all files record marker residuals",
+        description="Ignore data samples with a residual greater then the specified value. If the value is equal " +
+                    "to 0 all valid samples will be included. Note that not all files record marker residuals",
         min=0., max=1000000.0,
         soft_min=0., soft_max=100.0,
-    )
-
-    include_event_markers: BoolProperty(
-        name="Include event markers",
-        description="Add recorded events as 'pose markers' to the action sequence. To be able to view the markers " +
-                    "the setting Marker > Show Pose Markers must be enabled in the Action Editor",
-        default=True,
-    )
-
-    include_empty_labels: BoolProperty(
-        name="Include empty labels",
-        description="Create channels for labels with no valid keyframes",
-        default=False,
     )
 
     # -----
@@ -197,6 +198,13 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     # -----
     # Transformation settings (included to allow manual modification of spatial data in the loading process)
     # -----
+    global_scale: FloatProperty(
+        name="Scale",
+        description="Scaling factor applied to geometric (spatial) data, multiplied with other embedded factors",
+        min=0.001, max=1000.0,
+        default=1.0,
+    )
+
     use_manual_orientation: BoolProperty(
         name="Manual Orientation",
         description="Specify orientation manually rather then use interpretations from embedded data. " +
@@ -204,15 +212,8 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
         default=False,
     )
 
-    global_scale: FloatProperty(
-        name="Scale",
-        description="Scaling factor applied to geometric (spatial) data, multiplied with other (embedded) factors",
-        min=0.001, max=1000.0,
-        default=1.0,
-    )
-
     # -----
-    # Debug settings
+    # Debug and test settings
     # -----
     print_file: BoolProperty(
         name="Print File Information",
@@ -222,7 +223,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
 
     load_mem_efficient: BoolProperty(
         name="Memory Efficient",
-        description="Reduce memory footprint of the import process at the cost of ~40 times " +
+        description="Reduce the memory footprint for the import process for the cost of a ~40+ times " +
                     "longer processing time",
         default=False,
     )
@@ -286,11 +287,11 @@ class C3D_PT_action(bpy.types.Panel):
 
         layout.prop(operator, "adapt_frame_rate")
         layout.prop(operator, "fake_user")
+        layout.prop(operator, "include_event_markers")
+        layout.prop(operator, "include_empty_labels")
         layout.prop(operator, "interpolation")
         layout.prop(operator, "min_camera_count")
         layout.prop(operator, "max_residual")
-        layout.prop(operator, "include_event_markers")
-        layout.prop(operator, "include_empty_labels")
 
 
 class C3D_PT_marker_armature(bpy.types.Panel):
