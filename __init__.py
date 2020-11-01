@@ -185,9 +185,9 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
 
     include_event_markers: BoolProperty(
         name="Include event markers",
-        description="Add recorded events as 'pose markers' to the action sequence. To view 'pose markers' the " +
-                    "setting Marker > Show Pose Markers must be enabled in the Action Editor",
-        default=False,
+        description="Add recorded events as 'pose markers' to the action sequence. To be able to view the markers " +
+                    "the setting Marker > Show Pose Markers must be enabled in the Action Editor",
+        default=True,
     )
 
     include_empty_labels: BoolProperty(

@@ -368,13 +368,13 @@ class C3DParseDictionary:
             tshape = np.shape(timings)
             if ecount > len(labels):
                 raise ValueError('C3D events could not be parsed. Expected %i labels found %i.' % (ecount, len(labels)))
-            elif ecount > tshape[-1]:
-                raise ValueError('C3D events could not be parsed. Expected %i timings found %i.' % (ecount, tshape[-1]))
+            elif ecount > tshape[0]:
+                raise ValueError('C3D events could not be parsed. Expected %i timings found %i.' % (ecount, tshape[0]))
 
             # Parse timing parameter, the parameter can contain two columns tracking
             # minutes and seconds separately. If only one column is present it's assumed
             # to be recorded in seconds.
-            if len(tshape) == 2 and tshape[0] == 2:
+            if len(tshape) == 2 and tshape[1] == 2:
                 frame_timings = timings[:, 0] * 60.0 * self.reader.point_rate
                 frame_timings += timings[:, 1] * self.reader.point_rate - self.reader.first_frame
             elif len(tshape) == 1:
@@ -382,7 +382,7 @@ class C3DParseDictionary:
             else:
                 raise ValueError(
                     'C3D events could not be parsed. Shape %s for the EVENT.TIMES parameter is not supported.' %\
-                    np.shape(timings))
+                    str(np.shape(timings)))
 
             # Combine label array with label context and return
             if context is not None:

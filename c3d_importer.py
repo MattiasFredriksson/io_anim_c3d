@@ -175,6 +175,8 @@ def read_events(operator, parser, action, conv_fac_frame_rate):
             marker.frame = int(np.round(frame * conv_fac_frame_rate))
     except ValueError as e:
         operator.report({'WARNING'}, str(e))
+    except TypeError as e:
+        operator.report({'WARNING'}, str(e))
 
 
 def valid_points(point_block, min_camera_count, max_residual):
