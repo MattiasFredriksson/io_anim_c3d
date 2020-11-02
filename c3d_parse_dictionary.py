@@ -714,7 +714,9 @@ class C3DParseDictionary:
         '''
         print("Frames (start,end):\t", self.reader.header.first_frame, self.reader.header.last_frame)
         print("POINT Channels:\t\t", self.reader.header.point_count)
+        print("ANALOG Channels:\t", self.reader.header.analog_count)
         print("Frame rate:\t\t", self.reader.header.frame_rate)
+        print("Analog rate:\t\t", self.reader.header.frame_rate * self.reader.header.analog_per_frame)
         print("Data Scalar:\t\t", self.reader.header.scale_factor, "  [negative if float representation is used]")
         print("Data format:\t\t", self.reader.proc_type)
 
