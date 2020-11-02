@@ -14,7 +14,7 @@ files = files[b:e]
 armature_obj = None
 
 
-print('Matching files: '+str(len(files)))
+print('Matching files: ' + str(len(files)))
 if len(files) == 0:
     raise Exception('No matching files found')
 

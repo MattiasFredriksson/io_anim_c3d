@@ -23,6 +23,7 @@
 
 import sys
 import numpy as np
+from .c3d.c3d import Reader
 
 ###############
 # Standalone module to interface with the parser for the .c3d format
@@ -100,8 +101,10 @@ def parseC3DString(param):
 class C3DParseDictionary:
     ''' C3D parser dictionary, facilitates association between parameter identifiers and parsing functions.
     '''
-    def __init__(self, filePath=None, parse_dict='basic'):
-
+    def __init__(self, file_path, parse_dict='basic'):
+        ''' Construct a parser for a .c3d file
+        '''
+        self.file_path = file_path
         # Set parse dictionary
         if parse_dict == 'basic':
             self.parse_dict = C3DParseDictionary.define_basic_dictionary()
@@ -109,29 +112,28 @@ class C3DParseDictionary:
             self.parse_dict = parse_dict
         else:
             self.parse_dict = []
-        # Set c3d reader
-        if filePath is None:
-            self.reader = None
-        else:
-            self.readFile(filePath)
+
 
     def __del__(self):
         # Destructor
         self.close()
 
-    def readFile(self, file_path):
-        # Open file handle
-        self.file_handle = open(file_path, 'rb')
-        # Generate
-        from .c3d.c3d import Reader
+    def __enter__(self):
+        # Open file handle and create a .c3d reader
+        self.file_handle = open(self.file_path, 'rb')
         self.reader = Reader(self.file_handle)
-        # Localize some params:
-        self.groups = list(filter_names(self.reader.groups))
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        self.close()
 
     def close(self):
-        self.file_handle.close()
+        ''' Close an open .c3d file
+        '''
+        if self.file_handle and not self.file_handle.closed:
+            self.file_handle.close()
 
-    def getGroup(self, group_id):
+    def get_group(self, group_id):
         ''' Get a group from a group name id
         '''
         return self.reader.get(group_id, None)
@@ -139,7 +141,7 @@ class C3DParseDictionary:
     def get_param(self, group_id, param_id):
         ''' Fetch a parameter struct from group and param id:s
         '''
-        group = self.getGroup(group_id) 	# Fetch group
+        group = self.get_group(group_id) 	# Fetch group
         if group is None:					# Verify fetch
             return None                     # Return None if group does not exist
         return group.get(param_id, None)    # Fetch param or return None if not found
@@ -147,7 +149,7 @@ class C3DParseDictionary:
     def get_paramNames(self, group_id):
         ''' Get an iterable over parameter group names.
         '''
-        group = self.getGroup(group_id) 		 # Fetch group
+        group = self.get_group(group_id) 		 # Fetch group
         if group is None:						 # Verify fetch
             return None
         return list(filter_names(group.params))  # Fetch param or return None if not found
@@ -647,6 +649,11 @@ class C3DParseDictionary:
         ''' Fetch software specific dictionaries defining parameters used to
             manage specific software implementations.
         '''
+        #   Comment MF:
+        #   Concept of a software specific dictionary may not be an optimal solution.
+        #   The approach do however provide modularity when there is a necessity to
+        #   vary the approach used when parsing files generated from specific exporters.
+        #
         software = self.parse_param_string('MANUFACTURER', 'SOFTWARE')
 
         if software is not None:
@@ -672,6 +679,7 @@ class C3DParseDictionary:
         '''
         self.parse_dict[param_id] = function
 
+    @staticmethod
     def define_basic_dictionary():
         ''' Basic dictionary
         '''
@@ -694,7 +702,6 @@ class C3DParseDictionary:
             # or the same parameter as both a 32 bit floating point and 32 bit unsigned integer (in different files)!
             'LONG_FRAMES': C3DParseDictionary.parse_param_any_integer,
         }
-    # end define_basic_dictionary()
 
     """
     --------------------------------------------------------
@@ -710,11 +717,6 @@ class C3DParseDictionary:
         print("Frame rate:\t\t", self.reader.header.frame_rate)
         print("Data Scalar:\t\t", self.reader.header.scale_factor, "  [negative if float representation is used]")
         print("Data format:\t\t", self.reader.proc_type)
-
-    def print_groups(self):
-        ''' Print a list over names of each group in the loaded file
-        '''
-        print(self.groups)
 
     def print_param_header(self, group_id, param_id):
         ''' Print parameter header information. Prints name, dimension, and byte
@@ -737,44 +739,11 @@ class C3DParseDictionary:
     def print_parameters(self, group_id):
         ''' Try parse all parameters in a group and print the result.
         '''
-        group = self.getGroup(group_id)
+        group = self.get_group(group_id)
         if group is None:					# Verify fetch
             return
         for pid in group.params:
             print('\'' + pid + '\': ', self.try_parse_param(group_id, pid))
-
-    def print_group_info(self, group_id):
-        ''' Print header information for all parameters in a group followed by a
-            list of all attempts to parse parameter data in the group.
-
-        Params:
-        ----
-        group_id: String identifier for the group to print info from.
-        '''
-        print(), print()
-        # Print parameter headers for the group:
-        for id in self.get_paramNames(group_id):
-            self.print_param_header(group_id, id)
-        print(), print()
-        # Try parse all parameters and print each
-        self.print_parameters(group_id)
-
-    def print_individual_param(self, group_id, param_id):
-        '''
-        Print binary and each type of parsed data (Float, Signed Int, Unsigned Int)
-        for a specified parameter. Useful for quickly debugging the data storage
-        type for a parameter.
-
-        Params:
-        ----
-        group_id: String identifier for the group containing the parameter.
-        param_id: String identifier for the parameter to print info from, in the group.
-        '''
-        self.print_data(group_id, param_id)							# Print binary data
-        print("TRY: ", self.try_parse_param(group_id, param_id))		# print(try parse call)
-        print("FLT: ", self.parse_param_float(group_id, param_id))    # print(custom parse call)
-        print("INT: ", self.parse_param_int(group_id, param_id))	    # print(custom parse call)
-        print("UINT: ", self.parse_param_uint(group_id, param_id))    # print(custom parse call)
 
     def print_file(self):
         ''' Combination of print_header_info() and print_parameters() over all groups
@@ -788,12 +757,11 @@ class C3DParseDictionary:
         print("Paramaters:")
         print("------------------------------")
         # All group parameters
-        for group in self.groups:
+        for group in filter_names(self.reader.groups):
             print('')
             print('')
             print("'" + group + "':")
             print("------------------------------")
             self.print_parameters(group)
-        # end
         print("------------------------------")
 # end
