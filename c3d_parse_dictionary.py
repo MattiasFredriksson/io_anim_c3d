@@ -696,7 +696,7 @@ class C3DParseDictionary:
             'UNITS': C3DParseDictionary.parse_param_string,
             'LABELS': C3DParseDictionary.parse_param_string,
             'DESCRIPTIONS': C3DParseDictionary.parse_param_string,
-            # Test cases stored START/END fields as as uint32 but in indicated 2 16 bit words..
+            # Test cases stored START/END fields as as uint32 but in 2 16 bit words..
             'ACTUAL_START_FIELD': C3DParseDictionary.parse_param_uint_32,
             'ACTUAL_END_FIELD': C3DParseDictionary.parse_param_uint_32,
             # or the same parameter as both a 32 bit floating point and 32 bit unsigned integer (in different files)!
