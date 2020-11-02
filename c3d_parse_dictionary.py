@@ -113,7 +113,6 @@ class C3DParseDictionary:
         else:
             self.parse_dict = []
 
-
     def __del__(self):
         # Destructor
         self.close()
@@ -359,7 +358,7 @@ class C3DParseDictionary:
     def events(self):
         ''' Get an iterable over EVENTS defined in the file.
         '''
-        if self.get_param('EVENT', 'LABELS') == None:
+        if self.get_param('EVENT', 'LABELS') is None:
             return self.header_events()
         else:
             ecount = int(self.parse_param_any('EVENT', 'USED'))
@@ -383,7 +382,7 @@ class C3DParseDictionary:
                 frame_timings = timings * self.reader.point_rate - self.reader.first_frame
             else:
                 raise ValueError(
-                    'C3D events could not be parsed. Shape %s for the EVENT.TIMES parameter is not supported.' %\
+                    'C3D events could not be parsed. Shape %s for the EVENT.TIMES parameter is not supported.' %
                     str(np.shape(timings)))
 
             # Combine label array with label context and return
