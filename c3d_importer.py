@@ -61,7 +61,7 @@ def load(operator, context, filepath="",
     # Open file and read parameter headers
     parser = C3DParseDictionary(filepath)
     if print_file:
-        parser.printFile()
+        parser.print_file()
     if parser.reader.point_used == 0:
         operator.report({'WARNING'}, 'No POINT data in file: %s' % filepath)
         return {'CANCELLED'}
@@ -91,12 +91,12 @@ def load(operator, context, filepath="",
 
     # Read labels, remove labels matching criteria as defined
     # in regard to the software used to generate the file.
-    labels = parser.getPointChannelLabels()
+    labels = parser.point_labels()
     if apply_label_mask:
-        point_mask = parser.generateLabelMask(labels, 'POINT')
+        point_mask = parser.generate_label_mask(labels, 'POINT')
     else:
         point_mask = np.ones(np.shape(labels), np.bool)
-    labels = C3DParseDictionary.generateUniqueLabels(labels[point_mask])
+    labels = C3DParseDictionary.make_labels_unique(labels[point_mask])
     # Equivalent to number of channels used in POINT data
     nlabels = len(labels)
     if nlabels == 0:
@@ -170,7 +170,7 @@ def read_events(operator, parser, action, conv_fac_frame_rate):
     ''' Read events from the loaded c3d file and add them as 'pose_markers' to the action.
     '''
     try:
-        for (frame, label) in parser.getEvents():
+        for (frame, label) in parser.events():
             marker = action.pose_markers.new(label)
             marker.frame = int(np.round(frame * conv_fac_frame_rate))
     except ValueError as e:

@@ -104,7 +104,7 @@ class C3DParseDictionary:
 
         # Set parse dictionary
         if parse_dict == 'basic':
-            self.parse_dict = C3DParseDictionary.defineBasicDictionary()
+            self.parse_dict = C3DParseDictionary.define_basic_dictionary()
         elif isinstance(parse_dict, dict):
             self.parse_dict = parse_dict
         else:
@@ -136,7 +136,7 @@ class C3DParseDictionary:
         '''
         return self.reader.get(group_id, None)
 
-    def getParam(self, group_id, param_id):
+    def get_param(self, group_id, param_id):
         ''' Fetch a parameter struct from group and param id:s
         '''
         group = self.getGroup(group_id) 	# Fetch group
@@ -144,7 +144,7 @@ class C3DParseDictionary:
             return None                     # Return None if group does not exist
         return group.get(param_id, None)    # Fetch param or return None if not found
 
-    def getParamNames(self, group_id):
+    def get_paramNames(self, group_id):
         ''' Get an iterable over parameter group names.
         '''
         group = self.getGroup(group_id) 		 # Fetch group
@@ -158,16 +158,16 @@ class C3DParseDictionary:
     --------------------------------------------------------
     """
 
-    def tryParseParam(self, group_id, param_id):
+    def try_parse_param(self, group_id, param_id):
         ''' Try parse a specified parameter, if parsing is not specified through the
             parse dictionary it will attempt to guess the appropriate format.
         '''
-        value = self.parseKnownParam(group_id, param_id)
+        value = self.parse_known_param(group_id, param_id)
         if value is None:					# Verify fetch
-            return self.parseParamAny(group_id, param_id)
+            return self.parse_param_any(group_id, param_id)
         return value
 
-    def parseKnownParam(self, group_id, param_id):
+    def parse_known_param(self, group_id, param_id):
         ''' Parse attributes defined in the parsing dictionary
         '''
         func = self.parse_dict.get(param_id, None)
@@ -175,7 +175,7 @@ class C3DParseDictionary:
             return None
         return func(self, group_id, param_id)
 
-    def parseParamAny(self, group_id, param_id):
+    def parse_param_any(self, group_id, param_id):
         '''
         Parse param as either a 32 bit floating point value or an integer unsigned integer representation
         (including string representations).
@@ -186,15 +186,15 @@ class C3DParseDictionary:
         Param_id:   Parameter id.
         Returns:    Value(s) of interpreted type either as a single element of the type or array.
         '''
-        param = self.getParam(group_id, param_id)
+        param = self.get_param(group_id, param_id)
         if param is None:
             return None
         if param.bytes_per_element == 4:
-            return self.parseParamFloat(group_id, param_id)
+            return self.parse_param_float(group_id, param_id)
         else:
-            return self.parseParamUInt(group_id, param_id)
+            return self.parse_param_uint(group_id, param_id)
 
-    def parseParamString(self, group_id, param_id):
+    def parse_param_string(self, group_id, param_id):
         ''' Get a string or list of strings from the specified parameter.
 
         Params:
@@ -203,12 +203,12 @@ class C3DParseDictionary:
         Param_id:   Parameter id.
         Returns:    String or array of strings.
         '''
-        param = self.getParam(group_id, param_id)
+        param = self.get_param(group_id, param_id)
         if param is None:
             return None
         return parseC3DString(param)
 
-    def parseParamFloat(self, group_id, param_id):
+    def parse_param_float(self, group_id, param_id):
         ''' Get a ndarray of integers from a group parameter.
 
         Params:
@@ -217,7 +217,7 @@ class C3DParseDictionary:
         Param_id:   Parameter id.
         Returns:    Float value or an array of float values.
         '''
-        param = self.getParam(group_id, param_id)
+        param = self.get_param(group_id, param_id)
         if(param is None):
             return None
         if(param.bytes_per_element == 4):
@@ -227,7 +227,7 @@ class C3DParseDictionary:
         else:
             return None
 
-    def parseParamInt(self, group_id, param_id):
+    def parse_param_int(self, group_id, param_id):
         ''' Get a ndarray of integers from a group parameter.
 
         Params:
@@ -236,11 +236,11 @@ class C3DParseDictionary:
         Param_id:   Parameter id.
         Returns:    Integer value or an array of int values.
         '''
-        param = self.getParam(group_id, param_id)
+        param = self.get_param(group_id, param_id)
         if(param is None):
             return None
         if(param.bytes_per_element == -1):  # String data
-            return self.parseParamString(group_id, param_id)
+            return self.parse_param_string(group_id, param_id)
         elif(param.bytes_per_element == 1):
             return parseC3DArray(param, dtype=np.int8)
         elif(param.bytes_per_element == 2):
@@ -252,7 +252,7 @@ class C3DParseDictionary:
         else:
             return None
 
-    def parseParamUInt(self, group_id, param_id):
+    def parse_param_uint(self, group_id, param_id):
         ''' Get a ndarray of integers from a group parameter.
 
         Params:
@@ -261,11 +261,11 @@ class C3DParseDictionary:
         Param_id:   Parameter id.
         Returns:    Unsigned integer value or an array of uint values.
         '''
-        param = self.getParam(group_id, param_id)
+        param = self.get_param(group_id, param_id)
         if(param is None):
             return None
         if(param.bytes_per_element == -1):  # Byte representation indicate string data
-            return self.parseParamString(group_id, param_id)
+            return self.parse_param_string(group_id, param_id)
         elif(param.bytes_per_element == 1):
             return parseC3DArray(param, dtype=np.uint8)
         elif(param.bytes_per_element == 2):
@@ -277,7 +277,7 @@ class C3DParseDictionary:
         else:
             return None
 
-    def parseParamAnyInteger(self, group_id, param_id):
+    def parse_param_any_integer(self, group_id, param_id):
         ''' Evaluate any reasonable conversion of the parameter to a 32 bit unsigned integer representation.
 
         Params:
@@ -286,12 +286,12 @@ class C3DParseDictionary:
         Param_id:   Parameter id.
         Returns:    Integer or float value (representing an integer).
         '''
-        param = self.getParam(group_id, param_id)
+        param = self.get_param(group_id, param_id)
         if(param is None):
             return None
         return param._as_integer_value
 
-    def parseParamUInt_32(self, group_id, param_id):
+    def parse_param_uint_32(self, group_id, param_id):
         ''' Get a single 32 bit unsigned integers from a parameter group.
 
         Params:
@@ -300,12 +300,12 @@ class C3DParseDictionary:
         Param_id:   Parameter id.
         Returns:    First 32 bits interpreted as an unsigned integer value.
         '''
-        param = self.getParam(group_id, param_id)
+        param = self.get_param(group_id, param_id)
         if(param is None):
             return None
         return param.uint32_value
 
-    def parseParamFloat_32(self, group_id, param_id):
+    def parse_param_float_32(self, group_id, param_id):
         ''' Get a single 32 bit floating point from a parameter group.
 
         Params:
@@ -314,7 +314,7 @@ class C3DParseDictionary:
         Param_id:   Parameter id.
         Returns:    First 32 bits interpreted as an floating point value.
         '''
-        param = self.getParam(group_id, param_id)
+        param = self.get_param(group_id, param_id)
         if(param is None):
             return None
         return param.float_value
@@ -346,7 +346,7 @@ class C3DParseDictionary:
     --------------------------------------------------------
     """
 
-    def getHeaderEvents(self):
+    def header_events(self):
         ''' Get an iterable over header events. Each item is on the form (frame_timing, label) and type (float, string).
         '''
         header = self.reader.header
@@ -354,16 +354,16 @@ class C3DParseDictionary:
         timings = header.event_timings[header.event_disp_flags] * self.reader.point_rate - self.reader.first_frame
         return zip(timings, header.event_labels[header.event_disp_flags])
 
-    def getEvents(self):
+    def events(self):
         ''' Get an iterable over EVENTS defined in the file.
         '''
-        if self.getParam('EVENT', 'LABELS') == None:
-            return self.getHeaderEvents()
+        if self.get_param('EVENT', 'LABELS') == None:
+            return self.header_events()
         else:
-            ecount = int(self.parseParamAny('EVENT', 'USED'))
-            labels = self.parseLabels('EVENT', 'LABELS')
-            context = self.parseLabels('EVENT', 'CONTEXTS')
-            timings = self.parseMultiParameter('EVENT', 'TIMES', C3DParseDictionary.parseParamFloat)
+            ecount = int(self.parse_param_any('EVENT', 'USED'))
+            labels = self.parse_labels('EVENT', 'LABELS')
+            context = self.parse_labels('EVENT', 'CONTEXTS')
+            timings = self.parse_multi_parameter('EVENT', 'TIMES', C3DParseDictionary.parse_param_float)
 
             tshape = np.shape(timings)
             if ecount > len(labels):
@@ -413,8 +413,8 @@ class C3DParseDictionary:
         O_data = np.identity(3)
         msg = None
 
-        axis_x = self.parseParamString('POINT', 'X_SCREEN')
-        axis_y = self.parseParamString('POINT', 'Y_SCREEN')
+        axis_x = self.parse_param_string('POINT', 'X_SCREEN')
+        axis_y = self.parse_param_string('POINT', 'Y_SCREEN')
         # If both X/Y_SCREEN axis can't be parsed, default case:
         if axis_x not in AXIS_DICT or axis_y not in AXIS_DICT:
             axis_x = 'X'
@@ -473,7 +473,7 @@ class C3DParseDictionary:
         # Conversion factor (scale)
         conv_fac = 1.0
         # Convert data from unit defined in 'GROUP.UNITS'
-        data_unit = self.parseParamString(group_id, param_id)
+        data_unit = self.parse_param_string(group_id, param_id)
         if data_unit is not None:
             if islist(data_unit):
                 # Convert a list of units
@@ -498,14 +498,17 @@ class C3DParseDictionary:
         # Return the conversion factor
         return conv_fac
 
-    def parseMultiParameter(self, group_id, param_ids, pfunction='C3DParseDictionary.parseParamAny'):
+    def parse_multi_parameter(self, group_id, param_ids, pfunction='C3DParseDictionary.parse_param_any'):
         ''' Get concatenated list of values for a group parameter stored in multiple entries.
+
+        Parameters with multiple entries are parameters such as label entries which can't be stored in a single
+        parameter. Instead the parameter is stored as: POINT.LABELS, POINT.LABELS2, ..., POINT.LABELSN.
 
         Params:
         ----
         group_id:   Group from which the labels should be parsed.
         param_ids:  List of parameter identifiers for which label information is stored, e.g. ['LABELS'].
-        pfunction:  Function used to parse the group parameter, default is parseParamAny(...).
+        pfunction:  Function used to parse the group parameter, default is parse_param_any(...).
         Returns:    Numpy array containing parsed values.
         '''
         if not islist(param_ids):
@@ -536,7 +539,7 @@ class C3DParseDictionary:
         else:
             return np.array([])
 
-    def parseLabels(self, group_id, param_ids=['LABELS']):
+    def parse_labels(self, group_id, param_ids=['LABELS']):
         ''' Get a list of labels from a group.
 
         Params:
@@ -546,12 +549,12 @@ class C3DParseDictionary:
                     Note that all label parameters will be checked for extended formats such as
         Returns:    Numpy array of label strings.
         '''
-        return self.parseMultiParameter(group_id, param_ids, C3DParseDictionary.parseParamString)
+        return self.parse_multi_parameter(group_id, param_ids, C3DParseDictionary.parse_param_string)
 
-    def getPointChannelLabels(self, empty_label_prefix='EMPTY', missing_label_prefix='UNKNOWN'):
-        ''' Determine a set of unique labels for POINT data channels.
+    def point_labels(self, empty_label_prefix='EMPTY', missing_label_prefix='UNKNOWN'):
+        ''' Determine a set of unique labels for POINT data.
         '''
-        labels = self.parseLabels('POINT')
+        labels = self.parse_labels('POINT')
 
         used_label_count = self.reader.point_used
         if used_label_count == 0:
@@ -565,8 +568,9 @@ class C3DParseDictionary:
             unknown = ['%s_%00i' % (missing_label_prefix, i) for i in range(used_label_count - len(labels))]
             return np.concatenate((labels, unknown))
 
-    def generateUniqueLabels(labels, empty_label_prefix='EMPTY'):
-        ''' Generate an unique set label strings on form 'LABEL_XX'.
+    @staticmethod
+    def make_labels_unique(labels, empty_label_prefix='EMPTY'):
+        ''' Convert a list of string labels to an unique set of label strings on form 'LABEL_XX'.
 
         Params:
         ----
@@ -590,7 +594,7 @@ class C3DParseDictionary:
             out_list[i] = label
         return np.array(out_list)
 
-    def generateLabelMask(self, labels, group='POINT'):
+    def generate_label_mask(self, labels, group='POINT'):
         ''' Generate a mask for specified labels in accordance with common/software specific rules.
 
             Parameters:
@@ -599,26 +603,24 @@ class C3DParseDictionary:
             group:  Group labels are associated with, should be 'POINT' or 'ANALOG'.
             Return: Mask defined using a numpy bool array of equal shape to label argument.
         '''
-        dict = self.getSoftwareDictionary()
-        if dict is not None:
-            return self.generateSoftwareLabelMask(dict, labels, group)
-
+        soft_dict = self.software_dictionary()
+        if soft_dict is not None:
+            return self.generate_software_label_mask(soft_dict, labels, group)
         return np.ones(np.shape(labels), dtype=np.bool)
 
-    def generateSoftwareLabelMask(self, dict, labels, group='POINT'):
+    def generate_software_label_mask(self, soft_dict, labels, group='POINT'):
         ''' Generate a label mask in regard to the software used to generate the file.
-            Parameters are defined by getSoftwareDictionary().
+            Parameters are defined by software_dictionary().
 
             Parameters:
             -----
-            dict:   Python dict as fetched using getSoftwareDictionary().
-            labels: Labels for which the mask should be generated.
-            group:  Group labels are associated with, should be 'POINT' or 'ANALOG'.
-            Return: Mask defined using a numpy bool array of equal shape to label argument.
+            soft_dict:   Python dict as fetched using software_dictionary().
+            labels:     Labels for which the mask should be generated.
+            group:      Group labels are associated with, should be 'POINT' or 'ANALOG'.
+            Return:     Mask defined using a numpy bool array of equal shape to label argument.
         '''
-
         mask = np.ones(np.shape(labels), dtype=np.bool)
-        equal, contain, param = dict[('%s_EXCLUDE' % group)]
+        equal, contain, param = soft_dict['%s_EXCLUDE' % group]
 
         def contains_seq(item, words):
             ''' Checks if any word in words matches a sequence in the item. '''
@@ -628,7 +630,7 @@ class C3DParseDictionary:
             return False
 
         # Remove labels equivalent to parameter defined words and words defined in the dict.
-        equal = np.concatenate((equal, self.parseLabels(group, param)))
+        equal = np.concatenate((equal, self.parse_labels(group, param)))
         if len(equal) > 0:
             for i, l in enumerate(labels):
                 if l in equal:
@@ -641,19 +643,20 @@ class C3DParseDictionary:
 
         return mask
 
-    def getSoftwareDictionary(self):
+    def software_dictionary(self):
         ''' Fetch software specific dictionaries defining parameters used to
             manage specific software implementations.
         '''
-        software = self.parseParamString('MANUFACTURER', 'SOFTWARE')
+        software = self.parse_param_string('MANUFACTURER', 'SOFTWARE')
 
         if software is not None:
             if 'vicon' in software.lower():
-                return C3DParseDictionary.getViconDictionary()
+                return C3DParseDictionary.vicon_dictionary()
         # No specific software matched
         return None
 
-    def getViconDictionary():
+    @staticmethod
+    def vicon_dictionary():
         return {
             'POINT_EXCLUDE': [[], [], ['ANGLES', 'FORCES', 'POWERS', 'MOMENTS']]  # Equal, contain, parameter
         }
@@ -664,34 +667,34 @@ class C3DParseDictionary:
     --------------------------------------------------------
     """
 
-    def defineParseFunction(self, param_id, function):
+    def define_parse_function(self, param_id, function):
         ''' Append a parsing method to the dictionary
         '''
         self.parse_dict[param_id] = function
 
-    def defineBasicDictionary():
+    def define_basic_dictionary():
         ''' Basic dictionary
         '''
         return {
-            'USED': C3DParseDictionary.parseParamInt,
-            'FRAMES': C3DParseDictionary.parseParamAnyInteger,  # Try to convert to integer in any way
-            'DATA_START': C3DParseDictionary.parseParamInt,
-            'SCALE': C3DParseDictionary.parseParamFloat,
-            'RATE': C3DParseDictionary.parseParamFloat,
-            # 'MOVIE_DELAY':C3DParseDictionary.parseParamInt,
-            'MOVIE_ID': C3DParseDictionary.parseParamString,
-            'X_SCREEN': C3DParseDictionary.parseParamString,
-            'Y_SCREEN': C3DParseDictionary.parseParamString,
-            'UNITS': C3DParseDictionary.parseParamString,
-            'LABELS': C3DParseDictionary.parseParamString,
-            'DESCRIPTIONS': C3DParseDictionary.parseParamString,
+            'USED': C3DParseDictionary.parse_param_int,
+            'FRAMES': C3DParseDictionary.parse_param_any_integer,  # Try to convert to integer in any way
+            'DATA_START': C3DParseDictionary.parse_param_int,
+            'SCALE': C3DParseDictionary.parse_param_float,
+            'RATE': C3DParseDictionary.parse_param_float,
+            # 'MOVIE_DELAY':C3DParseDictionary.parse_param_int,
+            'MOVIE_ID': C3DParseDictionary.parse_param_string,
+            'X_SCREEN': C3DParseDictionary.parse_param_string,
+            'Y_SCREEN': C3DParseDictionary.parse_param_string,
+            'UNITS': C3DParseDictionary.parse_param_string,
+            'LABELS': C3DParseDictionary.parse_param_string,
+            'DESCRIPTIONS': C3DParseDictionary.parse_param_string,
             # Test cases stored START/END fields as as uint32 but in indicated 2 16 bit words..
-            'ACTUAL_START_FIELD': C3DParseDictionary.parseParamUInt_32,
-            'ACTUAL_END_FIELD': C3DParseDictionary.parseParamUInt_32,
+            'ACTUAL_START_FIELD': C3DParseDictionary.parse_param_uint_32,
+            'ACTUAL_END_FIELD': C3DParseDictionary.parse_param_uint_32,
             # or the same parameter as both a 32 bit floating point and 32 bit unsigned integer (in different files)!
-            'LONG_FRAMES': C3DParseDictionary.parseParamAnyInteger,
+            'LONG_FRAMES': C3DParseDictionary.parse_param_any_integer,
         }
-    # end defineBasicDictionary()
+    # end define_basic_dictionary()
 
     """
     --------------------------------------------------------
@@ -699,7 +702,7 @@ class C3DParseDictionary:
     --------------------------------------------------------
     """
 
-    def printHeaderInfo(self):
+    def print_header_info(self):
         ''' Print header info (partial) for the loaded file
         '''
         print("Frames (start,end):\t", self.reader.header.first_frame, self.reader.header.last_frame)
@@ -708,39 +711,39 @@ class C3DParseDictionary:
         print("Data Scalar:\t\t", self.reader.header.scale_factor, "  [negative if float representation is used]")
         print("Data format:\t\t", self.reader.proc_type)
 
-    def printGroups(self):
+    def print_groups(self):
         ''' Print a list over names of each group in the loaded file
         '''
         print(self.groups)
 
-    def printParamHeader(self, group_id, param_id):
+    def print_param_header(self, group_id, param_id):
         ''' Print parameter header information. Prints name, dimension, and byte
             information for the parameter struct.
         '''
-        param = self.getParam(group_id, param_id)
+        param = self.get_param(group_id, param_id)
         print("Parameter Name: ", param.name)
         print("Dimensions: ", dim(param))
         print("Bytes per elem: ", param.bytes_per_element)  # , " |-1 indicates string data|")
         print("Total Bytes: ", sys.getsizeof(param.bytes))
 
-    def printData(self, group_id, param_id):
+    def print_data(self, group_id, param_id):
         ''' Print the binary data struct for the specified parameter
         '''
-        param = self.getParam(group_id, param_id)
+        param = self.get_param(group_id, param_id)
         if(param is None):
             raise RuntimeError("Param ", param_id, " not Found in group ", group_id)
         print(param.bytes)
 
-    def printParameters(self, group_id):
+    def print_parameters(self, group_id):
         ''' Try parse all parameters in a group and print the result.
         '''
         group = self.getGroup(group_id)
         if group is None:					# Verify fetch
             return
         for pid in group.params:
-            print('\'' + pid + '\': ', self.tryParseParam(group_id, pid))
+            print('\'' + pid + '\': ', self.try_parse_param(group_id, pid))
 
-    def printGroupInfo(self, group_id):
+    def print_group_info(self, group_id):
         ''' Print header information for all parameters in a group followed by a
             list of all attempts to parse parameter data in the group.
 
@@ -750,13 +753,13 @@ class C3DParseDictionary:
         '''
         print(), print()
         # Print parameter headers for the group:
-        for id in self.getParamNames(group_id):
-            self.printParamHeader(group_id, id)
+        for id in self.get_paramNames(group_id):
+            self.print_param_header(group_id, id)
         print(), print()
         # Try parse all parameters and print each
-        self.printParameters(group_id)
+        self.print_parameters(group_id)
 
-    def printIndividualParam(self, group_id, param_id):
+    def print_individual_param(self, group_id, param_id):
         '''
         Print binary and each type of parsed data (Float, Signed Int, Unsigned Int)
         for a specified parameter. Useful for quickly debugging the data storage
@@ -767,20 +770,20 @@ class C3DParseDictionary:
         group_id: String identifier for the group containing the parameter.
         param_id: String identifier for the parameter to print info from, in the group.
         '''
-        self.printData(group_id, param_id)							# Print binary data
-        print("TRY: ", self.tryParseParam(group_id, param_id))		# print(try parse call)
-        print("FLT: ", self.parseParamFloat(group_id, param_id))    # print(custom parse call)
-        print("INT: ", self.parseParamInt(group_id, param_id))	    # print(custom parse call)
-        print("UINT: ", self.parseParamUInt(group_id, param_id))    # print(custom parse call)
+        self.print_data(group_id, param_id)							# Print binary data
+        print("TRY: ", self.try_parse_param(group_id, param_id))		# print(try parse call)
+        print("FLT: ", self.parse_param_float(group_id, param_id))    # print(custom parse call)
+        print("INT: ", self.parse_param_int(group_id, param_id))	    # print(custom parse call)
+        print("UINT: ", self.parse_param_uint(group_id, param_id))    # print(custom parse call)
 
-    def printFile(self):
-        ''' Combination of printHeaderInfo() and printParameters() over all groups
+    def print_file(self):
+        ''' Combination of print_header_info() and print_parameters() over all groups
         '''
         print(''), print(''), print("------------------------------")
         print("Header:")
         print("------------------------------"), print('')
         # Header
-        self.printHeaderInfo()
+        self.print_header_info()
         print(''), print(''), print("------------------------------")
         print("Paramaters:")
         print("------------------------------")
@@ -790,7 +793,7 @@ class C3DParseDictionary:
             print('')
             print("'" + group + "':")
             print("------------------------------")
-            self.printParameters(group)
+            self.print_parameters(group)
         # end
         print("------------------------------")
 # end
