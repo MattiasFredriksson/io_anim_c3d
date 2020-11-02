@@ -397,7 +397,7 @@ class C3DParseDictionary:
         ----
         sys_axis_up:   Up axis vector defining convention used for the system (normal to the horizontal ground plane).
         sys_axis_forw: Forward axis vector defining the full system convention (forward orientation on ground plane).
-        Returns:       3x3 orientation matrix for converting 3D data points.
+        Returns:       (3x3 orientation matrix for converting 3D data points, True if POINT.?_SCREEN param was parsed).
         '''
         # Axis conversion dictionary
         AXIS_DICT = {
@@ -412,7 +412,7 @@ class C3DParseDictionary:
             '-Z': [0, 0, -1.0],
         }
         O_data = np.identity(3)
-        msg = None
+        parsed_screen_param = True
 
         axis_x = self.parse_param_string('POINT', 'X_SCREEN')
         axis_y = self.parse_param_string('POINT', 'Y_SCREEN')
@@ -420,8 +420,7 @@ class C3DParseDictionary:
         if axis_x not in AXIS_DICT or axis_y not in AXIS_DICT:
             axis_x = 'X'
             axis_y = 'Z'
-            msg = 'Unable to parse X/Y_SCREEN information for POINT data, ' +\
-                  'manual adjustment to orientation may be necessary.'
+            parsed_screen_param = False
 
         # Interpret if both X/Y_SCREEN
         axis_x = AXIS_DICT[axis_x]
@@ -436,8 +435,7 @@ class C3DParseDictionary:
         O_sys[:, 2] = sys_axis_up / np.linalg.norm(sys_axis_up)
         O_sys[:, 0] = np.cross(O_sys[:, 1], O_sys[:, 2])
         # Orient from data basis -> system basis
-        return np.matmul(O_sys, O_data.T), msg
-    # end axis_interpretation()
+        return np.matmul(O_sys, O_data.T), parsed_screen_param
 
     def unit_conversion(self, group_id, param_id='UNITS', sys_unit=None):
         ''' Interpret unit conversion available for a parameter.

@@ -84,11 +84,12 @@ def load(operator, context, filepath="",
             # Convert to a numpy array matrix
             global_orient = np.array(global_orient)
         else:
-            global_orient, msg = parser.axis_interpretation([0, 0, 1], [0, 1, 0])
+            global_orient, parsed_screen_param = parser.axis_interpretation([0, 0, 1], [0, 1, 0])
             global_orient *= scale  # Uniform scale axis
 
-            if msg is not None:
-                operator.report({'INFO'}, msg)
+            if not parsed_screen_param:
+                operator.report({'INFO'}, 'Unable to parse X/Y_SCREEN information for POINT data, ' +
+                                          'manual adjustment to orientation may be necessary.')
 
         # Read labels, remove labels matching criteria as defined
         # in regard to the software used to generate the file.
