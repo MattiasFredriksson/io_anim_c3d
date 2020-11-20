@@ -45,11 +45,11 @@ if "bpy" in locals():
     # Reload subdirectory package?
     if "c3d" in locals():
         importlib.reload(c3d)
-    # Reload the sub-pacakge modules
+    # Reload the sub-pacakge modules.
     from .c3d import reload as reload_sub
     reload_sub()
     # ---
-    # Reload directory modules
+    # Reload directory modules.
     if "pyfuncs" in locals():
         importlib.reload(pyfuncs)
     if "perfmon" in locals():
@@ -89,11 +89,11 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
 
 
     # -----
-    # Parameters received from the file selection and ImportHelper
+    # Parameters received from the file selection and ImportHelper.
     # -----
     directory: StringProperty()
 
-    # File extesion specification and filter
+    # File extesion specification and filter.
     filename_ext = ".c3d"
     filter_glob: StringProperty(default='*' + filename_ext, options={'HIDDEN'})
 
@@ -196,7 +196,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     )
 
     # -----
-    # Transformation settings (included to allow manual modification of spatial data in the loading process)
+    # Transformation settings (included to allow manual modification of spatial data in the loading process).
     # -----
     global_scale: FloatProperty(
         name="Scale",
@@ -213,7 +213,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     )
 
     # -----
-    # Debug and test settings
+    # Debug and test settings.
     # -----
     print_file: BoolProperty(
         name="Print File Information",

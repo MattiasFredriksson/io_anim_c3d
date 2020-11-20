@@ -140,18 +140,18 @@ class C3DParseDictionary:
     def get_param(self, group_id, param_id):
         ''' Fetch a parameter struct from group and param id:s
         '''
-        group = self.get_group(group_id) 	# Fetch group
-        if group is None:					# Verify fetch
-            return None                     # Return None if group does not exist
-        return group.get(param_id, None)    # Fetch param or return None if not found
+        group = self.get_group(group_id) 	# Fetch group.
+        if group is None:					# Verify fetch.
+            return None                     # Return None if group does not exist.
+        return group.get(param_id, None)    # Fetch param or return None if not found.
 
     def get_paramNames(self, group_id):
         ''' Get an iterable over parameter group names.
         '''
-        group = self.get_group(group_id) 		 # Fetch group
-        if group is None:						 # Verify fetch
+        group = self.get_group(group_id) 		 # Fetch group.
+        if group is None:						 # Verify fetch.
             return None
-        return list(filter_names(group.params))  # Fetch param or return None if not found
+        return list(filter_names(group.params))  # Fetch param or return None if not found.
 
     """
     --------------------------------------------------------
@@ -164,7 +164,7 @@ class C3DParseDictionary:
             parse dictionary it will attempt to guess the appropriate format.
         '''
         value = self.parse_known_param(group_id, param_id)
-        if value is None:					# Verify fetch
+        if value is None:					# Verify fetch.
             return self.parse_param_any(group_id, param_id)
         return value
 
@@ -240,7 +240,7 @@ class C3DParseDictionary:
         param = self.get_param(group_id, param_id)
         if(param is None):
             return None
-        if(param.bytes_per_element == -1):  # String data
+        if(param.bytes_per_element == -1):  # String data.
             return self.parse_param_string(group_id, param_id)
         elif(param.bytes_per_element == 1):
             return parseC3DArray(param, dtype=np.int8)
@@ -265,7 +265,7 @@ class C3DParseDictionary:
         param = self.get_param(group_id, param_id)
         if(param is None):
             return None
-        if(param.bytes_per_element == -1):  # Byte representation indicate string data
+        if(param.bytes_per_element == -1):  # Byte representation indicate string data.
             return self.parse_param_string(group_id, param_id)
         elif(param.bytes_per_element == 1):
             return parseC3DArray(param, dtype=np.uint8)
@@ -351,7 +351,7 @@ class C3DParseDictionary:
         ''' Get an iterable over header events. Each item is on the form (frame_timing, label) and type (float, string).
         '''
         header = self.reader.header
-        # Convert event timing to a frame index (in floating point)
+        # Convert event timing to a frame index (in floating point).
         timings = header.event_timings[header.event_disp_flags] * self.reader.point_rate - self.reader.first_frame
         return zip(timings, header.event_labels[header.event_disp_flags])
 
@@ -385,7 +385,7 @@ class C3DParseDictionary:
                     'C3D events could not be parsed. Shape %s for the EVENT.TIMES parameter is not supported.' %
                     str(np.shape(timings)))
 
-            # Combine label array with label context and return
+            # Combine label array with label context and return.
             if context is not None:
                 labels = labels + '_' + context
             return zip(frame_timings, labels)
@@ -399,7 +399,7 @@ class C3DParseDictionary:
         sys_axis_forw: Forward axis vector defining the full system convention (forward orientation on ground plane).
         Returns:       (3x3 orientation matrix for converting 3D data points, True if POINT.?_SCREEN param was parsed).
         '''
-        # Axis conversion dictionary
+        # Axis conversion dictionary.
         AXIS_DICT = {
             'X': [1.0, 0, 0],
             '+X': [1.0, 0, 0],
@@ -416,25 +416,25 @@ class C3DParseDictionary:
 
         axis_x = self.parse_param_string('POINT', 'X_SCREEN')
         axis_y = self.parse_param_string('POINT', 'Y_SCREEN')
-        # If both X/Y_SCREEN axis can't be parsed, default case:
+        # If both X/Y_SCREEN axis can't be parsed, use default case:
         if axis_x not in AXIS_DICT or axis_y not in AXIS_DICT:
             axis_x = 'X'
             axis_y = 'Z'
             parsed_screen_param = False
 
-        # Interpret if both X/Y_SCREEN
+        # Interpret using both X/Y_SCREEN
         axis_x = AXIS_DICT[axis_x]
         axis_y = AXIS_DICT[axis_y]
         O_data[:, 0] = axis_x
         O_data[:, 1] = axis_y
         O_data[:, 2] = np.cross(axis_x, axis_y)
 
-        # Define the system third axis as the cross product:
+        # Define the system's third axis as the cross product:
         O_sys = np.empty((3, 3))
         O_sys[:, 1] = sys_axis_forw / np.linalg.norm(sys_axis_forw)
         O_sys[:, 2] = sys_axis_up / np.linalg.norm(sys_axis_up)
         O_sys[:, 0] = np.cross(O_sys[:, 1], O_sys[:, 2])
-        # Orient from data basis -> system basis
+        # Orient from data basis -> system basis.
         return np.matmul(O_sys, O_data.T), parsed_screen_param
 
     def unit_conversion(self, group_id, param_id='UNITS', sys_unit=None):
@@ -450,7 +450,7 @@ class C3DParseDictionary:
 
         Warning! Currently only supports units of length.
         '''
-        # Unit conversion dictionary
+        # Unit conversion dictionary.
         unit_dict = {
             # Metric
             'm': 1.0,
@@ -469,32 +469,32 @@ class C3DParseDictionary:
             # Default
             None: 1.0
         }
-        # Conversion factor (scale)
+        # Conversion factor (scale).
         conv_fac = 1.0
-        # Convert data from unit defined in 'GROUP.UNITS'
+        # Adjust conversion factor from unit defined in 'GROUP.UNITS':
         data_unit = self.parse_param_string(group_id, param_id)
         if data_unit is not None:
             if islist(data_unit):
-                # Convert a list of units
+                # Convert a list of units:
                 conv_fac = np.ones(len(data_unit))
                 for i, u in enumerate(data_unit):
                     u = u.lower()
                     if u in unit_dict:
                         conv_fac = unit_dict[u]
             else:
-                # Convert a single unit string
+                # Convert a single unit string:
                 data_unit = data_unit.lower()
                 if data_unit in unit_dict:
                     conv_fac = unit_dict[data_unit]
         else:
             print("No unit of length found for %s data." % group_id)
 
-        # Convert data to a specific unit (does not support conversion of different SI units)
+        # Convert data to a specific unit (does not support conversion of different SI units).
         if type(sys_unit) is str:
             conv2unit = unit_dict[sys_unit.lower()]
             conv_fac = conv_fac / conv2unit
 
-        # Return the conversion factor
+        # Return the conversion factor.
         return conv_fac
 
     def parse_multi_parameter(self, group_id, param_ids, pfunction='C3DParseDictionary.parse_param_any'):
@@ -578,17 +578,17 @@ class C3DParseDictionary:
         Returns:              Numpy list of label strings.
         '''
 
-        # Count duplicate labels
+        # Count duplicate labels.
         unique_labels, indices, count = np.unique(labels, return_inverse=True, return_counts=True)
         out_list = [None] * len(labels)
         counter = np.zeros(len(indices), np.int32)
         for i in range(len(indices)):
             index = indices[i]
             label = labels[i] if labels[i] != '' else empty_label_prefix
-            # If duplicate labels exist
+            # If duplicate labels exist, make unique.
             if count[index] > 1:
                 counter[index] += 1
-                # Generate unique label for repeated labels (if empty use prefix)
+                # Generate unique label for repeated labels (if empty use prefix).
                 label = '%s_%02i' % (label, counter[index])
             out_list[i] = label
         return np.array(out_list)
@@ -628,13 +628,13 @@ class C3DParseDictionary:
                     return True
             return False
 
-        # Remove labels equivalent to parameter defined words and words defined in the dict.
+        # Remove labels equivalent to words defined in the parameter and words defined in the dict:
         equal = np.concatenate((equal, self.parse_labels(group, param)))
         if len(equal) > 0:
             for i, l in enumerate(labels):
                 if l in equal:
                     mask[i] = False
-        # Remove labels with matching sub-sequences
+        # Remove labels with matching sub-sequences:
         if len(contain) > 0:
             for i, l in enumerate(labels):
                 if contains_seq(l, contain):
@@ -650,19 +650,20 @@ class C3DParseDictionary:
         #   Concept of a software specific dictionary may not be an optimal solution.
         #   The approach do however provide modularity when there is a necessity to
         #   vary the approach used when parsing files generated from specific exporters.
+        #   Changes and adaptations are welcome if relevant.
         #
         software = self.parse_param_string('MANUFACTURER', 'SOFTWARE')
 
         if software is not None:
             if 'vicon' in software.lower():
                 return C3DParseDictionary.vicon_dictionary()
-        # No specific software matched
+        # No specific software matched.
         return None
 
     @staticmethod
     def vicon_dictionary():
         return {
-            'POINT_EXCLUDE': [[], [], ['ANGLES', 'FORCES', 'POWERS', 'MOMENTS']]  # Equal, contain, parameter
+            'POINT_EXCLUDE': [[], [], ['ANGLES', 'FORCES', 'POWERS', 'MOMENTS']]  # Equal, contain, parameter.
         }
 
     """
@@ -682,7 +683,7 @@ class C3DParseDictionary:
         '''
         return {
             'USED': C3DParseDictionary.parse_param_int,
-            'FRAMES': C3DParseDictionary.parse_param_any_integer,  # Try to convert to integer in any way
+            'FRAMES': C3DParseDictionary.parse_param_any_integer,  # Try to convert to integer in any way.
             'DATA_START': C3DParseDictionary.parse_param_int,
             'SCALE': C3DParseDictionary.parse_param_float,
             'RATE': C3DParseDictionary.parse_param_float,
@@ -739,7 +740,7 @@ class C3DParseDictionary:
         ''' Try parse all parameters in a group and print the result.
         '''
         group = self.get_group(group_id)
-        if group is None:					# Verify fetch
+        if group is None:					# Verify fetch.
             return
         for pid in group.params:
             print('\'' + pid + '\': ', self.try_parse_param(group_id, pid))
@@ -755,7 +756,7 @@ class C3DParseDictionary:
         print(''), print(''), print("------------------------------")
         print("Paramaters:")
         print("------------------------------")
-        # All group parameters
+        # All group parameters.
         for group in filter_names(self.reader.groups):
             print('')
             print('')
