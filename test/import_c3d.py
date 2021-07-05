@@ -6,7 +6,7 @@ import os
 if '.blend' in __file__:
     # Fetch path from the text object in bpy.data.texts
     filename = os.path.basename(__file__)
-    filepath =  bpy.data.texts[filename].filepath
+    filepath = bpy.data.texts[filename].filepath
 else:
     filepath = __file__
 

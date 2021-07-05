@@ -29,6 +29,7 @@ from .c3d import Reader
 # Standalone module to interface with the parser for the .c3d format
 ###############
 
+
 def islist(N):
     ''' Check if 'N' object is any type of array
     '''
@@ -41,7 +42,6 @@ def dim(X):
     if not isinstance(X, np.ndarray) and isinstance(X[0], np.ndarray):
         return len(X[0].shape) + 1
     return len(np.shape(X))
-
 
 
 class C3DParseDictionary:

@@ -87,7 +87,6 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     bl_label = "Import C3D"
     bl_options = {'UNDO', 'PRESET'}
 
-
     # -----
     # Parameters received from the file selection and ImportHelper.
     # -----

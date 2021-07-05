@@ -119,9 +119,9 @@ def load(operator, context, filepath="",
 
         # Load
         read_data(parser, blen_curves, labels, point_mask, global_orient,
-                                      first_frame, nframes, conv_fac_frame_rate,
-                                      interpolation, max_residual,
-                                      perfmon)
+                  first_frame, nframes, conv_fac_frame_rate,
+                  interpolation, max_residual,
+                  perfmon)
 
         # Remove labels with no valid keyframes.
         if not include_empty_labels:
@@ -227,8 +227,7 @@ def read_data(parser, blen_curves, labels, point_mask, global_orient,
             keyframes[:, 1] = point_frames[frame_indices, dim, label_ind]
             fc.keyframe_points.foreach_set('co', keyframes.ravel())
 
-
-    if interpolation != 'BEZIER': # Bezier is default
+    if interpolation != 'BEZIER':  # Bezier is default
         for label_ind, fc_set in enumerate(blen_curves):
             for fc in fc_set:
                 for kf in fc.keyframe_points:

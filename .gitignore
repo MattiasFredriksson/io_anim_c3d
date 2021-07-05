@@ -1,3 +1,4 @@
 __pycache__/
 ignore/*
 test/testfiles/*
+c3d/README.*

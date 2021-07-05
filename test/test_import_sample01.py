@@ -10,7 +10,7 @@ class ImportC3DTestSample01(unittest.TestCase):
         if '.blend' in __file__:
             # Fetch path from the text object in bpy.data.texts
             filename = os.path.basename(__file__)
-            filepath =  bpy.data.texts[filename].filepath
+            filepath = bpy.data.texts[filename].filepath
         else:
             filepath = __file__
         IMPORT_DIR = os.path.join(os.path.dirname(filepath), '.\\testfiles\\sample01')
