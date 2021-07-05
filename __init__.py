@@ -108,8 +108,8 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     # -----
     adapt_frame_rate: BoolProperty(
         name="Frame rate",
-        description="Convert the sample rate to match the current Blender frame rate. " +
-                    "If False, keyframes will be inserted with 1 frame increments",
+        description="Adjust keyframes to match the sample rate of the current Blender scene. " +
+                    "If False, frames will be inserted in 1 frame increments",
         default=True,
     )
 
@@ -196,7 +196,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
 
     use_manual_orientation: BoolProperty(
         name="Manual Orientation",
-        description="Specify orientation manually rather then use information embedded in the file. ".
+        description="Specify orientation manually rather then use information embedded in the file",
         default=False,
     )
 
