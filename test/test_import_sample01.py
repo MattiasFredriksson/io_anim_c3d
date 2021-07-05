@@ -6,7 +6,15 @@ import unittest
 class ImportC3DTestSample01(unittest.TestCase):
 
     def setUpClass():
-        IMPORT_DIR = "C:\\Projects\\Code\\Blender\\Addons\\io_anim_c3d\\test\\testfiles\\sample01"
+        # Find import directory relative to __file__
+        if '.blend' in __file__:
+            # Fetch path from the text object in bpy.data.texts
+            filename = os.path.basename(__file__)
+            filepath =  bpy.data.texts[filename].filepath
+        else:
+            filepath = __file__
+        IMPORT_DIR = os.path.join(os.path.dirname(filepath), '.\\testfiles\\sample01')
+
         FILES = ['Eb015pi.c3d', 'Eb015pr.c3d', 'Eb015si.c3d', 'Eb015sr.c3d', 'Eb015vi.c3d', 'Eb015vr.c3d']
         os.chdir(IMPORT_DIR)
 
@@ -17,7 +25,8 @@ class ImportC3DTestSample01(unittest.TestCase):
         for file in FILES:
             # Parse
             bpy.ops.import_anim.c3d(filepath=os.path.join(IMPORT_DIR, file),
-                                    print_file=False, load_mem_efficient=True, include_empty_labels=False)
+                                    print_file=False,
+                                    include_empty_labels=False)
             # Fetch loaded objects
             obj = bpy.context.selected_objects[0]
             objs.append(obj)

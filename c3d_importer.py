@@ -37,13 +37,11 @@ def load(operator, context, filepath="",
          bone_size=0.02,
          adapt_frame_rate=True,
          fake_user=True,
-         interpolation='LINEAR',
-         min_camera_count=0,
+         interpolation='BEZIER',
          max_residual=0.0,
          include_event_markers=False,
          include_empty_labels=False,
          apply_label_mask=True,
-         load_mem_efficient=False,
          print_file=True):
 
     # Load more modules/packages once the importer is used
@@ -67,7 +65,7 @@ def load(operator, context, filepath="",
             operator.report({'WARNING'}, 'No POINT data in file: %s' % filepath)
             return {'CANCELLED'}
 
-        # Frame rate conversion factor.
+        # Factor converting .
         conv_fac_frame_rate = 1.0
         if adapt_frame_rate:
             conv_fac_frame_rate = bpy.context.scene.render.fps / parser.frame_rate
@@ -112,25 +110,18 @@ def load(operator, context, filepath="",
         nframes = parser.last_frame - first_frame + 1
         perfmon.message('Parsing: %i frames...' % nframes)
 
-        # Create an action to hold keyframe data.
+        # 1. Create an action to hold keyframe data.
+        # 2. Generate location (x,y,z) F-Curves for each label.
+        # 3. Format the curve list in sets of 3, each set associate with the x/y/z channels.
         action = create_action(file_name, fake_user=fake_user)
-        # Generate location (x,y,z) F-Curves for each label.
         blen_curves_arr = generate_blend_curves(action, labels, 3, 'pose.bones["%s"].location')
-        # Format the curve list in sets of 3, each set associate with the x/y/z channels.
         blen_curves = np.array(blen_curves_arr).reshape(nlabels, 3)
 
-        if load_mem_efficient:
-            # Primarily a test function.
-            read_data_mem_efficient(parser, blen_curves, labels, point_mask, global_orient,
-                                    first_frame, nframes, conv_fac_frame_rate,
-                                    interpolation, min_camera_count, max_residual,
-                                    perfmon)
-        else:
-            # Default processing func.
-            read_data_processor_efficient(parser, blen_curves, labels, point_mask, global_orient,
-                                          first_frame, nframes, conv_fac_frame_rate,
-                                          interpolation, min_camera_count, max_residual,
-                                          perfmon)
+        # Load
+        read_data(parser, blen_curves, labels, point_mask, global_orient,
+                                      first_frame, nframes, conv_fac_frame_rate,
+                                      interpolation, max_residual,
+                                      perfmon)
 
         # Remove labels with no valid keyframes.
         if not include_empty_labels:
@@ -181,25 +172,16 @@ def read_events(operator, parser, action, conv_fac_frame_rate):
         operator.report({'WARNING'}, str(e))
 
 
-def valid_points(point_block, min_camera_count, max_residual):
-    ''' Generate a mask for valid points read for a frame.
-    '''
-    valid = point_block[:, 4] >= min_camera_count
-    if max_residual > 0.0:
-        valid = np.logical_and(point_block[:, 3] < max_residual, valid)
-    return valid
-
-
-def read_data_processor_efficient(parser, blen_curves, labels, point_mask, global_orient,
-                                  first_frame, nframes, conv_fac_frame_rate,
-                                  interpolation, min_camera_count, max_residual,
-                                  perfmon):
+def read_data(parser, blen_curves, labels, point_mask, global_orient,
+              first_frame, nframes, conv_fac_frame_rate,
+              interpolation, max_residual,
+              perfmon):
     '''   Read valid POINT data from the file and create action keyframes.
     '''
     nlabels = len(labels)
 
     # Generate numpy arrays to store POINT data from each frame before creating keyframes.
-    point_frames = np.zeros([nframes, 3, nlabels], dtype=np.float64)
+    point_frames = np.zeros([nframes, 3, nlabels], dtype=np.float32)
     valid_samples = np.empty([nframes, nlabels], dtype=np.bool)
 
     ##
@@ -209,11 +191,14 @@ def read_data_processor_efficient(parser, blen_curves, labels, point_mask, globa
         index = i - first_frame
         # Apply masked samples.
         points = points[point_mask]
-        # Determine valid samples using columns 3:4.
-        valid_samples[index] = valid_points(points, min_camera_count, max_residual)
+        # Determine valid samples
+        valid = points[:, 3] >= 0.0
+        if max_residual > 0.0:
+            valid = np.logical_and(points[:, 3] < max_residual, valid)
+        valid_samples[index] = valid
 
         # Extract position coordinates from columns 0:3.
-        point_frames[index] = points[:, 0:3].T
+        point_frames[index] = points[:, :3].T
 
     # Re-orient and scale the data.
     point_frames = np.matmul(global_orient, point_frames)
@@ -227,75 +212,29 @@ def read_data_processor_efficient(parser, blen_curves, labels, point_mask, globa
     nkeys = np.sum(valid_samples, axis=0)
     frame_range = np.arange(0, nframes)
     # Iterate each group (tracker label).
-    for group_ind, fc_set in enumerate(blen_curves):
+    for label_ind, fc_set in enumerate(blen_curves):
         # Create keyframes.
+        nlabel_keys = nkeys[label_ind]
         for fc in fc_set:
-            fc.keyframe_points.add(nkeys[group_ind])
+            fc.keyframe_points.add(nlabel_keys)
 
         # Iterate valid frames and insert keyframes.
-        indices = frame_range[valid_samples[:, group_ind]]
-        for key_ind, (frame, p) in enumerate(zip(indices, point_frames[indices, :, group_ind])):
-            for dim, fc in enumerate(fc_set):
-                kf = fc.keyframe_points[key_ind]
-                kf.co = (frame * conv_fac_frame_rate, p[dim])
-                kf.interpolation = interpolation
+        frame_indices = frame_range[valid_samples[:, label_ind]]
+
+        for dim, fc in enumerate(fc_set):
+            keyframes = np.empty((nlabel_keys, 2), dtype=np.float32)
+            keyframes[:, 0] = frame_indices * conv_fac_frame_rate
+            keyframes[:, 1] = point_frames[frame_indices, dim, label_ind]
+            fc.keyframe_points.foreach_set('co', keyframes.ravel())
+
+
+    if interpolation != 'BEZIER': # Bezier is default
+        for label_ind, fc_set in enumerate(blen_curves):
+            for fc in fc_set:
+                for kf in fc.keyframe_points:
+                    kf.interpolation = interpolation
 
     perfmon.level_down('Keyframing Done.')
-
-
-def read_data_mem_efficient(parser, blen_curves, labels, point_mask, global_orient,
-                            first_frame, nframes, conv_fac_frame_rate,
-                            interpolation, min_camera_count, max_residual,
-                            perfmon):
-    '''Read POINT data block by block, inserting keyframes for a .c3d block at a time.
-
-    Note:
-    This function reads a .c3d block (frame) at a time, and uses insert(keyframe).
-    Inserting is very slow, but this might change in which case this an acceptable
-    solution. Now it serves two purposes:
-    1. Test and/or provide an example for how the code could be written.
-    2. Provide memory efficient loading, currently its useless due to the processing time but that might change.
-    '''
-    from . perfmon import new_sampler, begin_sample, end_sample, analyze_sample
-
-    perfmon.level_up('Processing POINT data..', True)
-    read_sampler, key_sampler = new_sampler(True), new_sampler()
-
-    for i, points, analog in parser.reader.read_frames(copy=False):
-        points = points[point_mask]
-        # Determine valid samples.
-        valid = valid_points(points, min_camera_count, max_residual)
-
-        # Re-orient and scale the data.
-        opoints = np.matmul(global_orient, points[:, 0:3].T).T
-
-        end_sample(read_sampler)
-        begin_sample(key_sampler)
-
-        # index = i - first_frame
-        frame = i * conv_fac_frame_rate
-
-        # Insert keyframes by iterating over each valid point and channel (x/y/z)
-        for value, fc in zip(opoints[valid].flat, blen_curves[valid].flat):
-            # Inserting keyframes is veeerry slooooww:
-            fc.keyframe_points.insert(frame, value, options={'FAST'}).interpolation = interpolation
-
-            # Fast insert that are added first, generates empty keyframes complicated to get rid of,
-            # hence it helps if the number of keyframes is known when using this method.
-            # kf = fc.keyframe_points[index]
-            # kf.co = (i, value)
-            # kf.interpolation = interpolation
-
-        end_sample(key_sampler)
-        begin_sample(read_sampler)
-
-    end_sample(read_sampler)
-
-    perfmon.level_down()
-    rtot, rmean = analyze_sample(read_sampler, 0, -1)
-    ktot, kmean = analyze_sample(key_sampler)
-    perfmon.message('File read (tot, mean):  %0.3f \t %f (s)' % (rtot, rmean))
-    perfmon.message('Key insert (tot, mean): %0.3f \t %f (s)' % (ktot, kmean))
 
 
 def create_action(action_name, object=None, fake_user=False):
