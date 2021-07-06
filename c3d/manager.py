@@ -347,30 +347,36 @@ class Manager(object):
         if self.header.first_frame < self.header.last_frame and self.header.last_frame != 65535:
             return self.header.last_frame
 
-        # Check different parameter options where the frame can be encoded
-        end_frame = [self.header.last_frame, 0.0, 0.0, 0.0]
+        # Try different parameters where the frame can be encoded
+        hlf = self.header.last_frame,
         param = self.get('TRIAL:ACTUAL_END_FIELD')
         if param is not None:
             # Encoded as 2 16 bit words (rather then 1 32 bit word)
             # words = param.uint16_array
             # end_frame[1] = words[0] + words[1] * 65536
-            end_frame[1] = param.uint32_value
+            end_frame = param.uint32_value
+            if hlf <= end_frame:
+                return end_frame
         param = self.get('POINT:LONG_FRAMES')
         if param is not None:
             # 'Should be' encoded as float
             if param.bytes_per_element >= 4:
-                end_frame[2] = int(param.float_value)
+                end_frame = int(param.float_value)
             else:
-                end_frame[2] = param.uint16_value
+                end_frame = param.uint16_value
+            if hlf <= end_frame:
+                return end_frame
         param = self.get('POINT:FRAMES')
         if param is not None:
             # Can be encoded either as 32 bit float or 16 bit uint
             if param.bytes_per_element == 4:
-                end_frame[3] = int(param.float_value)
+                end_frame = int(param.float_value)
             else:
-                end_frame[3] = param.uint16_value
-        # Return the largest of the all (queue bad reading...)
-        return int(np.max(end_frame))
+                end_frame = param.uint16_value
+            if hlf <= end_frame:
+                return end_frame
+        # Return header value by default
+        return hlf
 
     def get_screen_xy_strings(self):
         ''' Get the POINT:X_SCREEN and POINT:Y_SCREEN parameters as strings.

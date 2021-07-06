@@ -404,6 +404,7 @@ class ParamReadonly(object):
         ''' Get the parameter data as a value of 'traditional type'.
 
         Traditional types are defined in the Parameter section in the [user manual].
+        Provides a 'default option' for presenting data in unknown parameter entries.
 
         Returns
         -------
@@ -427,6 +428,7 @@ class ParamReadonly(object):
         ''' Get the parameter data as an array of 'traditional type'.
 
         Traditional types are defined in the Parameter section in the [user manual].
+        Provides a 'default option' for presenting data in unknown parameter entries.
 
         Returns
         -------
