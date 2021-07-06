@@ -136,7 +136,7 @@ class C3DParseDictionary:
         if self.get_param('EVENT', 'LABELS') is None:
             return self.header_events()
         else:
-            ecount = int(self.parse_param_any('EVENT', 'USED'))
+            ecount = int(self.parse_param_uint('EVENT', 'USED'))
             labels = self.parse_labels('EVENT', 'LABELS')
             context = self.parse_labels('EVENT', 'CONTEXTS')
             timings = self.parse_multi_parameter('EVENT', 'TIMES', C3DParseDictionary.parse_param_float_array)
