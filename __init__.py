@@ -45,11 +45,11 @@ if "bpy" in locals():
     # Reload subdirectory package?
     if "c3d" in locals():
         importlib.reload(c3d)
-    # Reload the sub-pacakge modules
+    # Reload the sub-pacakge modules.
     from .c3d import reload as reload_sub
     reload_sub()
     # ---
-    # Reload directory modules
+    # Reload directory modules.
     if "pyfuncs" in locals():
         importlib.reload(pyfuncs)
     if "perfmon" in locals():
@@ -87,13 +87,12 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     bl_label = "Import C3D"
     bl_options = {'UNDO', 'PRESET'}
 
-
     # -----
-    # Parameters received from the file selection and ImportHelper
+    # Parameters received from the file selection and ImportHelper.
     # -----
     directory: StringProperty()
 
-    # File extesion specification and filter
+    # File extesion specification and filter.
     filename_ext = ".c3d"
     filter_glob: StringProperty(default='*' + filename_ext, options={'HIDDEN'})
 
@@ -106,13 +105,10 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     # -----
     # Primary import settings
     # -----
-    # Setting for scaling frame rate to match blender frame rate.
-    # This does not reduce the number of keyframes. Keyframe reduction through interpolation might be useful to
-    # both simplify loaded data and improve performance (keyframe insertion is slow)...
     adapt_frame_rate: BoolProperty(
-        name="Convert Frame Rate",
-        description="Convert the sample rate to match the current Blender frame rate. " +
-                    "If set to False keyframes will be inserted at 1 frame increments",
+        name="Frame rate",
+        description="Adjust keyframes to match the sample rate of the current Blender scene. " +
+                    "If False, frames will be inserted in 1 frame increments",
         default=True,
     )
 
@@ -125,14 +121,14 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
 
     include_event_markers: BoolProperty(
         name="Include event markers",
-        description="Add labeled events as 'pose markers' to the action sequence. To be able to view the markers " +
-                    "the setting Marker > Show Pose Markers must be enabled in the Action Editor",
+        description="Add labeled events as 'pose markers' to the action sequence. Markers are only visible" +
+                    "if the setting: Marker > Show Pose Markers is enabled in the Action Editor",
         default=True,
     )
 
     include_empty_labels: BoolProperty(
         name="Include empty labels",
-        description="Create animation channels and armature bones for labeled point data without any valid keyframes",
+        description="Include channels for POINT labels without valid keyframes",
         default=False,
     )
 
@@ -156,15 +152,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     ),
         name="Interpolation",
         description="Keyframe interpolation",
-        default='LINEAR'
-    )
-
-    min_camera_count: IntProperty(
-        name="Min. camera count",
-        description="Minimum number of camera visibility flags required for a marker recording to be considered " +
-                    "valid (non-occluded). Note that not all files record visibility counters",
-        min=0, max=10,
-        default=0,
+        default='BEZIER'
     )
 
     # It should be noted that the standard states two custom representations:
@@ -172,9 +160,9 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     #      calculations, interpolation, or filtering'
     # -1: 'is used to indicate that a point is invalid'
     max_residual: FloatProperty(
-        name="Maximum Residual", default=0.0,
-        description="Ignore data samples with a residual greater then the specified value. If the value is equal " +
-                    "to 0 all valid samples will be included. Note that not all files record marker residuals",
+        name="Max. Residual", default=0.0,
+        description="Ignore samples with a residual greater then the specified value. If the value is equal " +
+                    "to 0, all valid samples will be included. Not all files record marker residuals",
         min=0., max=1000000.0,
         soft_min=0., soft_max=100.0,
     )
@@ -196,7 +184,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     )
 
     # -----
-    # Transformation settings (included to allow manual modification of spatial data in the loading process)
+    # Transformation settings (included to allow manual modification of spatial data in the loading process).
     # -----
     global_scale: FloatProperty(
         name="Scale",
@@ -207,24 +195,16 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
 
     use_manual_orientation: BoolProperty(
         name="Manual Orientation",
-        description="Specify orientation manually rather then use interpretations from embedded data. " +
-                    "Setting overrides the default orientation behavior",
+        description="Specify orientation manually rather then use information embedded in the file",
         default=False,
     )
 
     # -----
-    # Debug and test settings
+    # Debug settings.
     # -----
     print_file: BoolProperty(
-        name="Print File Information",
-        description="Print file and parameter headers to console",
-        default=True,
-    )
-
-    load_mem_efficient: BoolProperty(
-        name="Memory Efficient",
-        description="Reduce the memory footprint for the import process for the cost of a ~40+ times " +
-                    "longer processing time",
+        name="Print metadata",
+        description="Print file metadata to console",
         default=False,
     )
 
@@ -290,7 +270,6 @@ class C3D_PT_action(bpy.types.Panel):
         layout.prop(operator, "include_event_markers")
         layout.prop(operator, "include_empty_labels")
         layout.prop(operator, "interpolation")
-        layout.prop(operator, "min_camera_count")
         layout.prop(operator, "max_residual")
 
 

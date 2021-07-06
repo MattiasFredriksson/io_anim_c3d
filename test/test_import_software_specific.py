@@ -6,7 +6,14 @@ import unittest
 class ImportC3DTestVicon(unittest.TestCase):
 
     def setUpClass():
-        IMPORT_DIR = "C:\\Projects\\Code\\Blender\\Addons\\io_anim_c3d\\test\\testfiles\\sample00\\Vicon Motion Systems"
+        # Find import directory relative to __file__
+        if '.blend' in __file__:
+            # Fetch path from the text object in bpy.data.texts
+            filename = os.path.basename(__file__)
+            filepath = bpy.data.texts[filename].filepath
+        else:
+            filepath = __file__
+        IMPORT_DIR = os.path.join(os.path.dirname(filepath), '.\\testfiles\\sample00\\Vicon Motion Systems')
         FILE = 'TableTennis.c3d'
 
         # Parse file
