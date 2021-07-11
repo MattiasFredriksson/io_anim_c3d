@@ -31,6 +31,7 @@ Install in a Blender add-on folder
 
 1. Make sure the add-on is installed and enabled (see the 'How to Install' section).
 2. Go to File->Import->C3D (.c3d) to open the import window.
-3. Navigate to the folder containing the .c3d file, and... 
+3. Change the import settings (if needed).
+4. Navigate to the folder containing the .c3d file, and... 
     1. Double-click to import a single file or
     2. Select file(s) to import and click the 'Import C3D' button.
