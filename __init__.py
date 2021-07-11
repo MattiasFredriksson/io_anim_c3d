@@ -27,7 +27,7 @@ bl_info = {
     "version": (0, 1, 0),
     "blender": (2, 83, 0),
     "location": "File > Import",
-    "description": "C3D Optical Motion Capture, Point Cloud",
+    "description": "Imports C3D Optical Motion Capture (.c3d) files, animated Point Cloud data",
     "warning": "",
     "doc_url": "",
     "tracker_url": "https://github.com/MattiasFredriksson/io_anim_c3d/issues",
