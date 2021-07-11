@@ -14,7 +14,7 @@ Install from Blender
 1. Open Blender
 2. Open the Edit->Preferences window.
 3. Go to the 'Add-ons' tab.
-4. Click the 'Install...' button
+4. Click the 'Install...' button.
 5. Navigate to the folder containing the downloaded .zip file and double-click the file.
 6. Enable the addon 'Import-Export: C3D format' in the addon window.
 
