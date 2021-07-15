@@ -227,7 +227,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
                         failed.append(path)
                 except Exception as e:
                     import traceback
-                    print('') # Some spacing, or flushes the 'parsing bvh' print (old code)
+                    print('')
                     traceback.print_exc()
                     print('')
                     failed.append(path)
