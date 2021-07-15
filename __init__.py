@@ -88,7 +88,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     bl_options = {'UNDO', 'PRESET'}
 
     # -----
-    # Parameters received from the file selection and ImportHelper.
+    # Parameters received from the file selection window through the ImportHelper.
     # -----
     directory: StringProperty()
 
@@ -218,24 +218,37 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
         import os
 
         if self.files:
-            dirname = os.path.dirname(self.filepath)
-            finished = 0
+            failed = []
             for file in self.files:
-                path = os.path.join(dirname, file.name)
-                if c3d_importer.load(self, context, filepath=path, **keywords) == {'FINISHED'}:
-                    finished += 1
+                path = os.path.join(self.directory, file.name)
+                try:
+                    msg = c3d_importer.load(self, context, filepath=path, **keywords)
+                    if msg != {'FINISHED'}:
+                        failed.append(path)
+                except Exception as e:
+                    import traceback
+                    print('') # Some spacing, or flushes the 'parsing bvh' print (old code)
+                    traceback.print_exc()
+                    print('')
+                    failed.append(path)
 
-            # Generate errors if errors occured
-            if finished == 0:
-                self.report({'ERROR'}, 'Failed loading .c3d file(s)')
-            elif finished < len(self.files):
-                self.report({'WARNING'}, 'Failed to load %i of %i files' %
-                            (len(self.files) - finished, len(self.files)))
-
-            if finished > 0:
-                return {'FINISHED'}
-            else:
-                return {'CANCELLED'}
+            # Report any file issue(s)
+            if failed:
+                failed_files = ''
+                for path in failed:
+                    failed_files += '\n' + path
+                if len(failed) == len(self.files):
+                    self.report(
+                        {'ERROR'},
+                        'Failed to load any of the .bvh files(s):%s' % failed_files
+                        )
+                    return {'CANCELLED'}
+                else:
+                    self.report(
+                        {'WARNING'},
+                        'Failed loading .bvh files(s):%s' % failed_files
+                        )
+            return {'FINISHED'}
         else:
             return c3d_importer.load(self, context, filepath=self.filepath, **keywords)
 
