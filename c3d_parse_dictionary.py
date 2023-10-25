@@ -366,7 +366,7 @@ class C3DParseDictionary:
         soft_dict = self.software_dictionary()
         if soft_dict is not None:
             return self.generate_software_label_mask(soft_dict, labels, group)
-        return np.ones(np.shape(labels), dtype=np.bool)
+        return np.ones(np.shape(labels), dtype=bool)
 
     def generate_software_label_mask(self, soft_dict, labels, group='POINT'):
         ''' Generate a label mask in regard to the software used to generate the file.
@@ -379,7 +379,7 @@ class C3DParseDictionary:
             group:      Group labels are associated with, should be 'POINT' or 'ANALOG'.
             Return:     Mask defined using a numpy bool array of equal shape to label argument.
         '''
-        mask = np.ones(np.shape(labels), dtype=np.bool)
+        mask = np.ones(np.shape(labels), dtype=bool)
         equal, contain, param = soft_dict['%s_EXCLUDE' % group]
 
         def contains_seq(item, words):

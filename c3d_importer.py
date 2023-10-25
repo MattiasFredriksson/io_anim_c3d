@@ -95,7 +95,7 @@ def load(operator, context, filepath="",
         if apply_label_mask:
             point_mask = parser.generate_label_mask(labels, 'POINT')
         else:
-            point_mask = np.ones(np.shape(labels), np.bool)
+            point_mask = np.ones(np.shape(labels), bool)
         labels = C3DParseDictionary.make_labels_unique(labels[point_mask])
         # Equivalent to the number of channels used in POINT data.
         nlabels = len(labels)
@@ -182,7 +182,7 @@ def read_data(parser, blen_curves, labels, point_mask, global_orient,
 
     # Generate numpy arrays to store POINT data from each frame before creating keyframes.
     point_frames = np.zeros([nframes, 3, nlabels], dtype=np.float32)
-    valid_samples = np.empty([nframes, nlabels], dtype=np.bool)
+    valid_samples = np.empty([nframes, nlabels], dtype=bool)
 
     ##
     # Start reading POINT blocks (and analog, but analog signals from force plates etc. are not supported).
