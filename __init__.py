@@ -406,7 +406,6 @@ class C3D_PT_debug(bpy.types.Panel):
         operator = sfile.active_operator
 
         layout.prop(operator, "print_file")
-        layout.prop(operator, "load_mem_efficient")
 
 #######################
 # Register Menu Items
