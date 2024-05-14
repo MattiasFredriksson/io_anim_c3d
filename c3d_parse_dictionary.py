@@ -23,7 +23,7 @@
 
 import sys
 import numpy as np
-from .c3d import Reader
+from .c3d.c3d import Reader
 
 ###############
 # Standalone module to interface with the parser for the .c3d format
@@ -174,7 +174,7 @@ class C3DParseDictionary:
         sys_axis_forw: Forward axis vector defining the full system convention (forward orientation on ground plane).
         Returns:       (3x3 orientation matrix for converting 3D data points, True if POINT.?_SCREEN param was parsed).
         '''
-        val = self.reader.get_screen_xy_axis()
+        val = self.reader.get_screen_axis()
         if val:
             axis_x, axis_y = val
             parsed_screen_param = True
@@ -366,7 +366,7 @@ class C3DParseDictionary:
         soft_dict = self.software_dictionary()
         if soft_dict is not None:
             return self.generate_software_label_mask(soft_dict, labels, group)
-        return np.ones(np.shape(labels), dtype=np.bool)
+        return np.ones(np.shape(labels), dtype=bool)
 
     def generate_software_label_mask(self, soft_dict, labels, group='POINT'):
         ''' Generate a label mask in regard to the software used to generate the file.
@@ -379,7 +379,7 @@ class C3DParseDictionary:
             group:      Group labels are associated with, should be 'POINT' or 'ANALOG'.
             Return:     Mask defined using a numpy bool array of equal shape to label argument.
         '''
-        mask = np.ones(np.shape(labels), dtype=np.bool)
+        mask = np.ones(np.shape(labels), dtype=bool)
         equal, contain, param = soft_dict['%s_EXCLUDE' % group]
 
         def contains_seq(item, words):
