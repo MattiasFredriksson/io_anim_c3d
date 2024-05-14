@@ -42,7 +42,8 @@ def load(operator, context, filepath="",
          include_event_markers=False,
          include_empty_labels=False,
          apply_label_mask=True,
-         print_file=True):
+         print_file=True,
+         split_actors=True):
 
     # Load more modules/packages once the importer is used
     from bpy_extras.io_utils import axis_conversion

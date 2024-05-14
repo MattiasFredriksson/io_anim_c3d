@@ -132,6 +132,12 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
         default=False,
     ) # type: ignore
 
+    split_actors: BoolProperty(
+        name = "Split actors",
+        description="Creates armature for each actor or prop",
+        default=True,
+    )# type: ignore
+
     # Interpolation settings (link below), there is such thing as to many settings so ignored ones
     # seemingly redundant.
     # https://docs.blender.org/api/current/bpy.types.Keyframe.html#bpy.types.Keyframe.interpolation
@@ -317,6 +323,7 @@ class C3D_PT_marker_armature(bpy.types.Panel):
         layout.enabled = operator.create_armature
 
         layout.prop(operator, "bone_size")
+        layout.prop(operator, "split_actors")
 
 
 class C3D_PT_import_transform(bpy.types.Panel):
