@@ -59,8 +59,8 @@ if "bpy" in locals():
     if "c3d_importer" in locals():
         importlib.reload(c3d_importer)
 
-import bpy
-from bpy.props import (
+import bpy # type: ignore
+from bpy.props import ( # type: ignore
     StringProperty,
     BoolProperty,
     IntProperty,
@@ -68,7 +68,7 @@ from bpy.props import (
     EnumProperty,
     CollectionProperty,
 )
-from bpy_extras.io_utils import (
+from bpy_extras.io_utils import ( # type: ignore
     ImportHelper,
     # ExportHelper,
     orientation_helper,
@@ -90,17 +90,17 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     # -----
     # Parameters received from the file selection window through the ImportHelper.
     # -----
-    directory: StringProperty()
+    directory: StringProperty() # type: ignore
 
     # File extesion specification and filter.
     filename_ext = ".c3d"
-    filter_glob: StringProperty(default='*' + filename_ext, options={'HIDDEN'})
+    filter_glob: StringProperty(default='*' + filename_ext, options={'HIDDEN'}) # type: ignore
 
     # Properties
     files: CollectionProperty(
         name="File Path",
         type=bpy.types.OperatorFileListElement,
-    )
+    ) # type: ignore
 
     # -----
     # Primary import settings
@@ -110,27 +110,27 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
         description="Adjust keyframes to match the sample rate of the current Blender scene. " +
                     "If False, frames will be inserted in 1 frame increments",
         default=True,
-    )
+    ) # type: ignore
 
     fake_user: BoolProperty(
         name="Fake User",
         description="Set the fake user flag for imported action sequence(s) " +
                     "(fake user flag ensures imported sequences will be saved in the .blend file)",
         default=False,
-    )
+    ) # type: ignore
 
     include_event_markers: BoolProperty(
         name="Include event markers",
         description="Add labeled events as 'pose markers' to the action sequence. Markers are only visible" +
                     "if the setting: Marker > Show Pose Markers is enabled in the Action Editor",
         default=True,
-    )
+    ) # type: ignore
 
     include_empty_labels: BoolProperty(
         name="Include empty labels",
         description="Include channels for POINT labels without valid keyframes",
         default=False,
-    )
+    ) # type: ignore
 
     # Interpolation settings (link below), there is such thing as to many settings so ignored ones
     # seemingly redundant.
@@ -153,7 +153,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
         name="Interpolation",
         description="Keyframe interpolation",
         default='BEZIER'
-    )
+    ) # type: ignore
 
     # It should be noted that the standard states two custom representations:
     # 0:  'indicates that the 3D point coordinate is the result of modeling
@@ -165,7 +165,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
                     "to 0, all valid samples will be included. Not all files record marker residuals",
         min=0., max=1000000.0,
         soft_min=0., soft_max=100.0,
-    )
+    ) # type: ignore
 
     # -----
     # Armature settings
@@ -174,14 +174,14 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
         name="Create Armature",
         description="Generate an armature to display the animated point cloud",
         default=True,
-    )
+    ) # type: ignore
 
     bone_size: FloatProperty(
         name="Marker Size", default=0.02,
         description="Define the width of each marker bone",
         min=0.001, max=10.0,
         soft_min=0.01, soft_max=1.0,
-    )
+    ) # type: ignore
 
     # -----
     # Transformation settings (included to allow manual modification of spatial data in the loading process).
@@ -191,13 +191,13 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
         description="Scaling factor applied to geometric (spatial) data, multiplied with other embedded factors",
         min=0.001, max=1000.0,
         default=1.0,
-    )
+    ) # type: ignore
 
     use_manual_orientation: BoolProperty(
         name="Manual Orientation",
         description="Specify orientation manually rather then use information embedded in the file",
         default=False,
-    )
+    ) # type: ignore
 
     # -----
     # Debug settings.
@@ -206,7 +206,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
         name="Print metadata",
         description="Print file metadata to console",
         default=False,
-    )
+    ) # type: ignore
 
     def draw(self, context):
         pass
