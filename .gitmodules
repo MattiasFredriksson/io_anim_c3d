@@ -1,0 +1,3 @@
+[submodule "c3d"]
+	path = c3d
+	url = https://github.com/EmbodiedCognition/py-c3d.git
