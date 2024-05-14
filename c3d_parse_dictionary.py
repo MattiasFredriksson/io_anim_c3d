@@ -522,6 +522,12 @@ class C3DParseDictionary:
         for i, v in np.ndenumerate(strarr):
             strarr[i] = v.strip()
         return strarr
+    
+    def check_dimensions(self, param, param_id):
+        # Check if dimensions are provided and make sure they are valid
+        if not hasattr(param, 'dimensions') or not param.dimensions:
+            #print(f"Warning: No dimensions provided for parameter '{param_id}'. Assuming default [1].")
+            param.dimensions = [1]  # Assuming scalar if no dimensions provided
 
     def parse_param_float_array(self, group_id, param_id):
         ''' Get a ndarray of integers from a group parameter.
@@ -534,12 +540,12 @@ class C3DParseDictionary:
         '''
         param = self.get_param(group_id, param_id)
         if(param is None):
-            return
+            return None
+        self.check_dimensions(param, param_id)
         return param.float_array
 
     def parse_param_int_array(self, group_id, param_id):
         ''' Get a ndarray of integers from a group parameter.
-
         Params:
         ----
         group_id:   Parameter group id.
@@ -547,11 +553,11 @@ class C3DParseDictionary:
         Returns:    Integer value or an array of int values.
         '''
         param = self.get_param(group_id, param_id)
-        if(param is None):
+        if param is None:
             return None
-        if(param.bytes_per_element == -1):
-            return self.parse_param_string(group_id, param_id)
+        self.check_dimensions(param, param_id)
         return param.int_array
+
 
     def parse_param_uint_array(self, group_id, param_id):
         ''' Get a ndarray of integers from a group parameter.
@@ -567,6 +573,7 @@ class C3DParseDictionary:
             return None
         if(param.bytes_per_element == -1):
             return self.parse_param_string(group_id, param_id)
+        self.check_dimensions(param, param_id)
         return param.uint_array
 
     def parse_param_any_integer(self, group_id, param_id):
@@ -581,7 +588,7 @@ class C3DParseDictionary:
         param = self.get_param(group_id, param_id)
         if(param is None):
             return None
-        return param._as_any_uint
+        return param._as_integer_value
 
     def parse_param_int(self, group_id, param_id):
         ''' Get a single signed integers from a parameter group.
@@ -666,7 +673,7 @@ class C3DParseDictionary:
         group = self.get_group(group_id)
         if group is None:					# Verify fetch.
             return
-        for pid in group.keys():
+        for pid in group.param_keys():
             print('\'' + pid + '\': ', self.try_parse_param(group_id, pid))
 
     def print_file(self):
