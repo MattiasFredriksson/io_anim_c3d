@@ -681,7 +681,7 @@ class C3DParseDictionary:
         print("Paramaters:")
         print("------------------------------")
         # All group parameters.
-        for num, group in self.reader.listed():
+        for num, group in self.reader.group_listed():
             print('')
             print('')
             print("'" + group.name + "':")
