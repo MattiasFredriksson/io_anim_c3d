@@ -103,72 +103,107 @@ def load(operator, context, filepath="",
         # Read labels, remove labels matching hard-coded criteria
         # regarding the software used to generate the file.
         labels = parser.point_labels()
+
         if apply_label_mask:
-            point_mask = parser.generate_label_mask(labels, 'POINT')
+            software_mask = parser.generate_label_mask(labels, 'POINT')
         else:
-            point_mask = np.ones(np.shape(labels), bool)
-        labels = C3DParseDictionary.make_labels_unique(labels[point_mask])
-        # Equivalent to the number of channels used in POINT data.
-        nlabels = len(labels)
-        if nlabels == 0:
-            operator.report({'WARNING'}, 'All POINT data was culled in file: %s' % filepath)
-            return {'CANCELLED'}
+            software_mask = np.ones(np.shape(labels), bool)
 
-        # Number of frames [first, last] => +1.
-        # first_frame is the frame index to start parsing from.
-        # nframes is the number of frames to parse.
-        first_frame = parser.first_frame
-        nframes = parser.last_frame - first_frame + 1
-        perfmon.message('Parsing: %i frames...' % nframes)
+        armatures = {}
+        if split_actors:
+            armatures = get_actor_masks(labels)
+        else:
+            armatures[file_name] = np.ones(np.shape(labels), bool)
 
-        # 1. Create an action to hold keyframe data.
-        # 2. Generate location (x,y,z) F-Curves for each label.
-        # 3. Format the curve list in sets of 3, each set associate with the x/y/z channels.
-        action = create_action(file_name, fake_user=fake_user)
-        blen_curves_arr = generate_blend_curves(action, labels, 3, 'pose.bones["%s"].location')
-        blen_curves = np.array(blen_curves_arr).reshape(nlabels, 3)
+        for armature_name, armature_mask in armatures.items():
 
-        # Load
-        read_data(parser, blen_curves, labels, point_mask, global_orient,
-                  first_frame, nframes, conv_fac_frame_rate,
-                  interpolation, max_residual,
-                  perfmon)
+            point_mask = np.logical_and(software_mask, armature_mask)
 
-        # Remove labels with no valid keyframes.
-        if not include_empty_labels:
-            clean_empty_fcurves(action)
-        # Since we inserted our keyframes in 'FAST' mode, its best to update the fcurves now.
-        for fc in action.fcurves:
-            fc.update()
-        if action.fcurves == 0:
-            remove_action(action)
-            # All samples were either invalid or was previously culled in regard to the channel label.
-            operator.report({'WARNING'}, 'No valid POINT data in file: %s' % filepath)
-            return {'CANCELLED'}
+            unique_labels = C3DParseDictionary.make_labels_unique(labels[point_mask])
+            # Equivalent to the number of channels used in POINT data.
+            nlabels = len(unique_labels)
+            if nlabels == 0:
+                operator.report({'WARNING'}, 'All POINT data was culled for armature: %s' % armature_name)
 
-        # Parse events in the file (if specified).
-        if include_event_markers:
-            read_events(operator, parser, action, conv_fac_frame_rate)
+            # Number of frames [first, last] => +1.
+            # first_frame is the frame index to start parsing from.
+            # nframes is the number of frames to parse.
+            first_frame = parser.first_frame
+            nframes = parser.last_frame - first_frame + 1
+            perfmon.message('Parsing: %i frames...' % nframes)
 
-        # Create an armature matching keyframed data (if specified).
-        arm_obj = None
-        bone_radius = bone_size * 0.5
-        if create_armature:
-            final_labels = [fc_grp.name for fc_grp in action.groups]
-            arm_obj = create_armature_object(context, file_name, 'BBONE')
-            add_empty_armature_bones(context, arm_obj, final_labels, bone_size)
-            # Set the width of the bbones.
-            for bone in arm_obj.data.bones:
-                bone.bbone_x = bone_radius
-                bone.bbone_z = bone_radius
-            # Set the created action as active for the armature.
-            set_action(arm_obj, action, replace=False)
+            # 1. Create an action to hold keyframe data.
+            # 2. Generate location (x,y,z) F-Curves for each label.
+            # 3. Format the curve list in sets of 3, each set associate with the x/y/z channels.
+            action = create_action(file_name+"."+armature_name, fake_user=fake_user)
+            blen_curves_arr = generate_blend_curves(action, unique_labels, 3, 'pose.bones["%s"].location')
+            blen_curves = np.array(blen_curves_arr).reshape(nlabels, 3)
+
+            # Load
+            read_data(parser, blen_curves, unique_labels, point_mask, global_orient,
+                    first_frame, nframes, conv_fac_frame_rate,
+                    interpolation, max_residual,
+                    perfmon)
+
+            # Remove labels with no valid keyframes.
+            if not include_empty_labels:
+                clean_empty_fcurves(action)
+            # Since we inserted our keyframes in 'FAST' mode, its best to update the fcurves now.
+            for fc in action.fcurves:
+                fc.update()
+            if action.fcurves == 0:
+                remove_action(action)
+                # All samples were either invalid or was previously culled in regard to the channel label.
+                operator.report({'WARNING'}, 'No valid POINT data in file: %s' % filepath)
+                return {'CANCELLED'}
+
+            # Parse events in the file (if specified).
+            if include_event_markers:
+                read_events(operator, parser, action, conv_fac_frame_rate)
+
+            # Create an armature matching keyframed data (if specified).
+            arm_obj = None
+            bone_radius = bone_size * 0.5
+            if create_armature:
+                final_labels = [fc_grp.name for fc_grp in action.groups]
+                arm_obj = create_armature_object(context, armature_name, 'BBONE')
+                add_empty_armature_bones(context, arm_obj, final_labels, bone_size)
+                # Set the width of the bbones.
+                for bone in arm_obj.data.bones:
+                    bone.bbone_x = bone_radius
+                    bone.bbone_z = bone_radius
+                # Set the created action as active for the armature.
+                set_action(arm_obj, action, replace=False)
 
         perfmon.level_down("Import finished.")
 
         bpy.context.view_layer.update()
         return {'FINISHED'}
 
+def get_actor_masks(labels):
+    """
+    Generates point masks for each actor based on the labels.
+
+    Args:
+    labels: A list of strings in the format "actorName:data_point".
+
+    Returns:
+    A dictionary where keys are actor names and values are point masks.
+    """
+    actor_masks = {}
+
+    for item in labels:
+        actor, _ = item.split(":", 1) if ":" in item else ("UNLABELED", item)
+
+        if actor not in actor_masks:
+            # Create a point mask for this actor
+            if actor == "UNLABELED":
+                point_mask = [":" not in label for label in labels]
+            else:
+                point_mask = [label.startswith(actor + ":") for label in labels]
+            actor_masks[actor] = point_mask
+
+    return actor_masks
 
 def read_events(operator, parser, action, conv_fac_frame_rate):
     ''' Read events from the loaded c3d file and add them as 'pose_markers' to the action.
