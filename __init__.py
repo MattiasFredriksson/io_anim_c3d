@@ -105,13 +105,6 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     # -----
     # Primary import settings
     # -----
-    adapt_frame_rate: BoolProperty(
-        name="Frame rate",
-        description="Adjust keyframes to match the sample rate of the current Blender scene. " +
-                    "If False, frames will be inserted in 1 frame increments",
-        default=True,
-    ) # type: ignore
-
     fake_user: BoolProperty(
         name="Fake User",
         description="Set the fake user flag for imported action sequence(s) " +
@@ -214,6 +207,34 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
         default=False,
     ) # type: ignore
 
+    # -----
+    # Frame Rate Settings
+    # -----
+    resample_frame_rate: BoolProperty(
+        name="Resample frame rate",
+        description="Adjust keyframes to match the sample rate of the current Blender scene. " +
+                    "If False, frames will be inserted in 1 frame increments",
+        default=False,
+    ) # type: ignore
+
+    set_frame_rate: BoolProperty(
+        name="Set frame rate",
+        description="Sets the animation frame rate",
+        default=True,
+    ) # type: ignore
+
+    set_end_frame: BoolProperty(
+        name="Set end frame",
+        description="Sets the animation timeline end frame",
+        default=True,
+    ) # type: ignore
+
+    set_playback_mode: BoolProperty(
+        name="Set playback sync mode",
+        description="Sets the animation playback mode to Frame Drop",
+        default=True,
+    ) # type: ignore
+
     def draw(self, context):
         pass
 
@@ -284,7 +305,6 @@ class C3D_PT_action(bpy.types.Panel):
         sfile = context.space_data
         operator = sfile.active_operator
 
-        layout.prop(operator, "adapt_frame_rate")
         layout.prop(operator, "fake_user")
         layout.prop(operator, "include_event_markers")
         layout.prop(operator, "include_empty_labels")
@@ -382,6 +402,32 @@ class C3D_PT_import_transform_manual_orientation(bpy.types.Panel):
         layout.prop(operator, "axis_forward")
         layout.prop(operator, "axis_up")
 
+class C3D_PT_import_frame_rate(bpy.types.Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+    bl_label = "Frame Rate"
+    bl_parent_id = "FILE_PT_operator"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        return operator.bl_idname == "IMPORT_ANIM_OT_c3d"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False  # No animation.
+
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        layout.prop(operator, "resample_frame_rate")
+        layout.prop(operator, "set_frame_rate")
+        layout.prop(operator, "set_end_frame")
+        layout.prop(operator, "set_playback_mode")
 
 class C3D_PT_debug(bpy.types.Panel):
     bl_space_type = 'FILE_BROWSER'
@@ -429,6 +475,7 @@ classes = (
     C3D_PT_marker_armature,
     C3D_PT_import_transform,
     C3D_PT_import_transform_manual_orientation,
+    C3D_PT_import_frame_rate,
     C3D_PT_debug,
     # ExportC3D,
 )

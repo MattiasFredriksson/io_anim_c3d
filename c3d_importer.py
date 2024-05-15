@@ -35,7 +35,7 @@ def load(operator, context, filepath="",
          global_scale=1.0,
          create_armature=True,
          bone_size=0.02,
-         adapt_frame_rate=True,
+         resample_frame_rate=False,
          fake_user=True,
          interpolation='BEZIER',
          max_residual=0.0,
@@ -43,7 +43,10 @@ def load(operator, context, filepath="",
          include_empty_labels=False,
          apply_label_mask=True,
          print_file=True,
-         split_actors=True):
+         split_actors=True,
+         set_frame_rate=True,
+         set_end_frame=True,
+         set_playback_mode=True):
 
     # Load more modules/packages once the importer is used
     from bpy_extras.io_utils import axis_conversion
@@ -65,10 +68,17 @@ def load(operator, context, filepath="",
         if parser.reader.point_used == 0:
             operator.report({'WARNING'}, 'No POINT data in file: %s' % filepath)
             return {'CANCELLED'}
+        
+        if set_frame_rate:
+            bpy.context.scene.render.fps = int(parser.frame_rate)
+        if set_end_frame:
+            bpy.context.scene.frame_end = parser.last_frame
+        if set_playback_mode:
+            bpy.context.scene.sync_mode = 'FRAME_DROP'
 
         # Factor converting .
         conv_fac_frame_rate = 1.0
-        if adapt_frame_rate:
+        if resample_frame_rate:
             conv_fac_frame_rate = bpy.context.scene.render.fps / parser.frame_rate
 
         # Conversion factor for length measurements.
