@@ -37,7 +37,7 @@ def load(operator, context, filepath="",
          bone_size=0.02,
          resample_frame_rate=False,
          fake_user=True,
-         interpolation='BEZIER',
+         interpolation='LINEAR',
          max_residual=0.0,
          include_event_markers=False,
          include_empty_labels=False,
@@ -178,7 +178,24 @@ def load(operator, context, filepath="",
         perfmon.level_down("Import finished.")
 
         bpy.context.view_layer.update()
+
+        change_mode('POSE')
+        hide_object("UNLABELED")
+
         return {'FINISHED'}
+
+# Function to hide an armature in the viewport
+def hide_object(object_name):
+    # Ensure the object exists
+    if object_name in bpy.data.objects:
+        obj = bpy.data.objects[object_name]
+        # Hide the object in the viewport
+        obj.hide_set(True)
+        print(f"Object '{object_name}' has been hidden in the viewport.")
+    else:
+        print(f"Object '{object_name}' does not exist.")
+        
+    bpy.context.view_layer.update()
 
 def get_actor_masks(labels):
     """
@@ -339,16 +356,16 @@ def create_armature_object(context, name, display_type='OCTAHEDRAL'):
     return arm_obj
 
 
-def enter_clean_object_mode():
+def change_mode(mode_state):
     ''' Enter object mode and clear any selection.
     '''
     # Try to enter object mode, polling active object is unreliable since an object can be in edit mode but not active!
     try:
-        bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+        bpy.ops.object.mode_set(mode=mode_state, toggle=False)
+        # Clear any selection
+        bpy.ops.object.select_all(action='DESELECT')
     except RuntimeError:
         pass
-    # Clear any selection
-    bpy.ops.object.select_all(action='DESELECT')
 
 
 def add_empty_armature_bones(context, arm_obj, bone_names, length=0.1):
@@ -365,7 +382,7 @@ def add_empty_armature_bones(context, arm_obj, bone_names, length=0.1):
     assert arm_obj.type == 'ARMATURE', "Object passed to 'add_empty_armature_bones()' must be an armature."
 
     # Enter object mode.
-    enter_clean_object_mode()
+    change_mode('OBJECT')
     # Enter edit mode for the armature.
     arm_obj.select_set(True)
     bpy.context.view_layer.objects.active = arm_obj
