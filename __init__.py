@@ -453,6 +453,18 @@ class C3D_PT_debug(bpy.types.Panel):
 
         layout.prop(operator, "print_file")
 
+class C3D_PT_drag_and_drop(bpy.types.FileHandler):
+    bl_idname = "drag_and_drop.c3d"
+    bl_label = "Import C3D"
+    bl_import_operator = "import_anim.c3d"
+    bl_file_extensions = ".c3d"
+
+    @classmethod
+    def poll_drop(cls, context):
+        if context.space_data.type == "VIEW_3D":
+            return True
+
+
 #######################
 # Register Menu Items
 #######################
@@ -477,6 +489,7 @@ classes = (
     C3D_PT_import_transform_manual_orientation,
     C3D_PT_import_frame_rate,
     C3D_PT_debug,
+    C3D_PT_drag_and_drop,
     # ExportC3D,
 )
 
