@@ -58,6 +58,8 @@ if "bpy" in locals():
         importlib.reload(c3d_parse_dictionary)
     if "c3d_importer" in locals():
         importlib.reload(c3d_importer)
+    if "c3d_exporter" in locals():
+        importlib.reload(c3d_exporter)
 
 import bpy # type: ignore
 from bpy.props import ( # type: ignore
@@ -278,6 +280,33 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
             return {'FINISHED'}
         else:
             return c3d_importer.load(self, context, filepath=self.filepath, **keywords)
+        
+# Exporter
+class ExportC3D(bpy.types.Operator):
+    bl_idname = "export_scene.c3d"
+    bl_label = "Export C3D"
+
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+
+    def execute(self, context):
+        from . import c3d_exporter
+        c3d_exporter.export_c3d(self.filepath)
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+def menu_func_export(self, context):
+    self.layout.operator(ExportC3D.bl_idname, text="C3D (.c3d)")
+
+def register():
+    bpy.utils.register_class(ExportC3D)
+    bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
+
+def unregister():
+    bpy.utils.unregister_class(ExportC3D)
+    bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
 
 
 #######################
@@ -473,8 +502,8 @@ class C3D_PT_drag_and_drop(bpy.types.FileHandler):
 def menu_func_import(self, context):
     self.layout.operator(ImportC3D.bl_idname, text="C3D (.c3d)")
 
-# def menu_func_export(self, context):
-#    self.layout.operator(ExportC3D.bl_idname, text="C3D (.c3d)")
+def menu_func_export(self, context):
+   self.layout.operator(ExportC3D.bl_idname, text="C3D (.c3d)")
 
 #######################
 # Register Operator
@@ -490,7 +519,7 @@ classes = (
     C3D_PT_import_frame_rate,
     C3D_PT_debug,
     C3D_PT_drag_and_drop,
-    # ExportC3D,
+    ExportC3D,
 )
 
 
@@ -499,12 +528,12 @@ def register():
         bpy.utils.register_class(cl)
 
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
-    # bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
+    bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
 
 
 def unregister():
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
-    # bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
+    bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
 
     for cl in classes:
         bpy.utils.unregister_class(cl)
