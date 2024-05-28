@@ -1,8 +1,12 @@
 import bpy
 import numpy as np
 from .c3d.c3d import Writer
+from . perfmon import PerfMon
 
 def export_c3d(filepath):
+
+    perfmon = PerfMon()
+    perfmon.level_up(f'Exporting: {filepath}', True)
 
     # Get the scene data from Blender
     scene = bpy.context.scene
@@ -10,26 +14,11 @@ def export_c3d(filepath):
     frame_end = scene.frame_end
     frame_rate = scene.render.fps
 
-    # Determine the number of points (bones)
-    point_count = sum(len(obj.pose.bones) for obj in scene.objects if obj.type == 'ARMATURE')
+    # point_count = sum(len(obj.pose.bones) for obj in scene.objects if obj.type == 'ARMATURE')
 
-    frame_rate = 1
-    point_count = 10
-
-    # Create a new C3D writer object
     writer = Writer(frame_rate,0)
 
-    # Access the header once and set attributes
-    # header = writer.header
-    # header.point_count = point_count
-    # header.analog_count = point_count
-    # header.first_frame = frame_start
-    # header.last_frame = frame_end
-    # header.scale_factor = -1
-    # header.frame_rate = frame_rate
-
-
-        
+    perfmon.level_up(f'Collecting labels', True)
     #Initialize a list of bone names to keep track of the order of bones
     bone_names = []
     bone_count = 0
@@ -38,31 +27,33 @@ def export_c3d(filepath):
             for bone in obj.pose.bones:
                 bone_names.append(bone.name)
                 bone_count += 1
+    perfmon.level_down(f'Collecting labels finished')
     
-    # # Iterate over frames and collect positions
-    # for frame in range(frame_start, frame_end + 1):
-    #     scene.frame_set(frame)
-    #     bone_index = 0
-    #     frame_data = np.zeros((point_count,3))
-    #     for obj in scene.objects:
-    #         if obj.type == 'ARMATURE':
-    #             for bone in obj.pose.bones:
-    #                 bone_world_matrix = obj.matrix_world @ bone.matrix
-    #                 bone_head = bone_world_matrix.to_translation()
-    #                 frame_data[bone_index] = bone_head.xyz
-    #                 bone_index += 1
-    #                 writer.add_frames(frame_data)
-
-    points = np.zeros((bone_count, 5), np.float32)
-    analog = np.zeros((0, 0), dtype=np.float32)
-    frame = np.array([(points, analog)], dtype=object)
+    perfmon.level_up(f'Collecting frame data', True)
+    # Iterate over frames and collect positions
+    for frame in range(frame_start, frame_end + 1):
+        scene.frame_set(frame)
+        bone_index = 0
+        points = np.zeros((bone_count,5), np.float32)
+        analog = np.zeros((0, 0), dtype=np.float32)
+        for obj in scene.objects:
+            if obj.type == 'ARMATURE':
+                for bone in obj.pose.bones:
+                    bone_world_matrix = obj.matrix_world @ bone.matrix
+                    bone_head = bone_world_matrix.to_translation()
+                    points[bone_index, :3] = bone_head.xyz
+                    points[bone_index, 3] = 0
+                    points[bone_index, 4] = 0
+                    bone_index += 1
+        frame = np.array([(points, analog)], dtype=object)
+        writer.add_frames(frame)
+    perfmon.level_down(f'Collecting frame data finished')
 
     writer.set_point_labels(bone_names)
-    #writer.set_analog_labels = ["aA", "aB", "aC", "aD", "aE", "aF", "aG", "aH", "aI", "aJ"]
-    writer.set_analog_labels = []
-
-    writer.add_frames(frame)
+    # writer.set_analog_labels([])
 
     # Save the C3D file
     with open(filepath, 'wb') as f:
         writer.write(f)
+
+    perfmon.level_down("Export finished.")
