@@ -17,7 +17,7 @@ def export_c3d(filepath):
     point_count = 10
 
     # Create a new C3D writer object
-    writer = Writer(frame_rate,frame_rate)
+    writer = Writer(frame_rate,0)
 
     # Access the header once and set attributes
     # header = writer.header
@@ -28,16 +28,15 @@ def export_c3d(filepath):
     # header.scale_factor = -1
     # header.frame_rate = frame_rate
 
-    writer.header.analog_per_frame = 5
-
     points = np.zeros((10, 5), np.float32)
-    analog = np.zeros((10, 5), np.float32)
+    analog = np.zeros((0, 0), dtype=np.float32)
+    frame = np.array([(points, analog)], dtype=object)
 
     writer.set_point_labels(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"])
     #writer.set_analog_labels = ["aA", "aB", "aC", "aD", "aE", "aF", "aG", "aH", "aI", "aJ"]
     writer.set_analog_labels = []
 
-    writer.add_frames((points, analog))
+    writer.add_frames(frame)
 
         
     # Initialize a list of bone names to keep track of the order of bones
