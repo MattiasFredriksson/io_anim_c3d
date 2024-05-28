@@ -29,6 +29,8 @@ def export_c3d(filepath):
                 bone_count += 1
     perfmon.level_down(f'Collecting labels finished')
     
+    unit_scale = get_unit_scale() * 1000 # Convert to millimeters TODO: Add unit setting
+
     perfmon.level_up(f'Collecting frame data', True)
     # Iterate over frames and collect positions
     for frame in range(frame_start, frame_end + 1):
@@ -40,8 +42,8 @@ def export_c3d(filepath):
             if obj.type == 'ARMATURE':
                 for bone in obj.pose.bones:
                     bone_world_matrix = obj.matrix_world @ bone.matrix
-                    bone_head = bone_world_matrix.to_translation()
-                    points[bone_index, :3] = bone_head.xyz
+                    bone_pos = bone_world_matrix.to_translation() * unit_scale
+                    points[bone_index, :3] = bone_pos.xyz
                     points[bone_index, 3] = 0
                     points[bone_index, 4] = 0
                     bone_index += 1
@@ -57,3 +59,16 @@ def export_c3d(filepath):
         writer.write(f)
 
     perfmon.level_down("Export finished.")
+
+
+def get_unit_scale():
+    # Determine the unit scale to convert to meters
+    scene = bpy.context.scene
+    unit_scale = scene.unit_settings.scale_length
+    if scene.unit_settings.system == 'METRIC':
+        unit_conversion_factor = unit_scale
+    elif scene.unit_settings.system == 'IMPERIAL':
+        unit_conversion_factor = 25.4 * 12 * unit_scale / 1000  # Convert feet to meters
+    else:
+        unit_conversion_factor = unit_scale  # Default to meters if no system is set
+    return unit_conversion_factor
