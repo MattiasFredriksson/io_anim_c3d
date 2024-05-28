@@ -28,25 +28,16 @@ def export_c3d(filepath):
     # header.scale_factor = -1
     # header.frame_rate = frame_rate
 
-    points = np.zeros((10, 5), np.float32)
-    analog = np.zeros((0, 0), dtype=np.float32)
-    frame = np.array([(points, analog)], dtype=object)
-
-    writer.set_point_labels(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"])
-    #writer.set_analog_labels = ["aA", "aB", "aC", "aD", "aE", "aF", "aG", "aH", "aI", "aJ"]
-    writer.set_analog_labels = []
-
-    writer.add_frames(frame)
 
         
-    # Initialize a list of bone names to keep track of the order of bones
-    # bone_names = []
-    # bone_index = 0
-    # for obj in scene.objects:
-    #     if obj.type == 'ARMATURE':
-    #         for bone in obj.pose.bones:
-    #             bone_names.append((obj.name, bone.name))
-    #             bone_index += 1
+    #Initialize a list of bone names to keep track of the order of bones
+    bone_names = []
+    bone_count = 0
+    for obj in scene.objects:
+        if obj.type == 'ARMATURE':
+            for bone in obj.pose.bones:
+                bone_names.append(bone.name)
+                bone_count += 1
     
     # # Iterate over frames and collect positions
     # for frame in range(frame_start, frame_end + 1):
@@ -61,6 +52,16 @@ def export_c3d(filepath):
     #                 frame_data[bone_index] = bone_head.xyz
     #                 bone_index += 1
     #                 writer.add_frames(frame_data)
+
+    points = np.zeros((bone_count, 5), np.float32)
+    analog = np.zeros((0, 0), dtype=np.float32)
+    frame = np.array([(points, analog)], dtype=object)
+
+    writer.set_point_labels(bone_names)
+    #writer.set_analog_labels = ["aA", "aB", "aC", "aD", "aE", "aF", "aG", "aH", "aI", "aJ"]
+    writer.set_analog_labels = []
+
+    writer.add_frames(frame)
 
     # Save the C3D file
     with open(filepath, 'wb') as f:
