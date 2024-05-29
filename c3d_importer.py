@@ -72,7 +72,8 @@ def load(operator, context, filepath="",
         if set_frame_rate:
             bpy.context.scene.render.fps = int(parser.frame_rate)
         if set_end_frame:
-            bpy.context.scene.frame_end = parser.last_frame
+            bpy.context.scene.frame_end = parser.last_frame - 1
+            bpy.context.scene.frame_start = parser.first_frame
         if set_playback_mode:
             bpy.context.scene.sync_mode = 'FRAME_DROP'
 
