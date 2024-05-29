@@ -11,7 +11,7 @@ def export_c3d(filepath):
     # Get the scene data from Blender
     scene = bpy.context.scene
     frame_start = scene.frame_start
-    frame_end = scene.frame_end
+    frame_end = scene.frame_end+1
     frame_rate = scene.render.fps
 
     # point_count = sum(len(obj.pose.bones) for obj in scene.objects if obj.type == 'ARMATURE')
@@ -32,23 +32,40 @@ def export_c3d(filepath):
     unit_scale = get_unit_scale() * 1000 # Convert to millimeters TODO: Add unit setting
 
     perfmon.level_up(f'Collecting frame data', True)
-    # Iterate over frames and collect positions
-    for frame in range(frame_start, frame_end + 1):
-        scene.frame_set(frame)
-        bone_index = 0
-        points = np.zeros((bone_count,5), np.float32)
-        analog = np.zeros((0, 0), dtype=np.float32)
-        for obj in scene.objects:
-            if obj.type == 'ARMATURE':
-                for bone in obj.pose.bones:
-                    bone_world_matrix = obj.matrix_world @ bone.matrix
-                    bone_pos = bone_world_matrix.to_translation() * unit_scale
-                    points[bone_index, :3] = bone_pos.xyz
-                    points[bone_index, 3] = 0
-                    points[bone_index, 4] = 0
-                    bone_index += 1
-        frame = np.array([(points, analog)], dtype=object)
-        writer.add_frames(frame)
+
+    # Create frames data structure and fill it with default values
+    frame_count = frame_end-frame_start
+
+    points = np.zeros((bone_count, 5), np.float32)
+    points[:, 3] = -1  # Set residual to -1
+
+    analog = np.zeros((0, 0), dtype=np.float32)
+    frames = [(points.copy(), analog.copy()) for _ in range(frame_count)]
+
+    # Process each object in the scene
+    for ob in bpy.context.scene.objects:
+        if ob.type != 'ARMATURE' or ob.animation_data is None or ob.animation_data.action is None:
+            continue
+        for fcu in ob.animation_data.action.fcurves:
+            # Extract the bone name from the data path
+            # Example data path: 'pose.bones["Bone"].location'
+            data_path_split = fcu.data_path.split('"')
+            if len(data_path_split) <= 1:
+                continue
+            bone_name = data_path_split[1]
+
+            if bone_name in bone_names:
+                bone_index = bone_names.index(bone_name)
+                for kp in fcu.keyframe_points:
+                    frame_index = int(kp.co[0]) - frame_start
+                    if 0 <= frame_index < frame_count:
+                        # Fill in points with keyframe value at the appropriate position
+                        frames[frame_index][0][bone_index, fcu.array_index] = kp.co[1] * unit_scale
+                        frames[frame_index][0][bone_index, 3] = 0 # Set residual
+
+
+    writer.add_frames(frames)
+
     perfmon.level_down(f'Collecting frame data finished')
 
     writer.set_point_labels(bone_names)
