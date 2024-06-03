@@ -1,3 +1,4 @@
 [submodule "c3d"]
 	path = c3d
-	url = https://github.com/EmbodiedCognition/py-c3d.git
+	url = https://github.com/metricminds-com/py-c3d.git
+	branch = 221228_correct_reader_conversion
