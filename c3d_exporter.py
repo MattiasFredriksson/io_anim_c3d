@@ -1,7 +1,6 @@
 import bpy
 import numpy as np
 from .c3d.c3d import Writer
-from . import c3d_patch
 from . perfmon import PerfMon
 
 def export_c3d(filepath):
@@ -70,7 +69,6 @@ def export_c3d(filepath):
                     frames[frame_index][0][bone_index, fcu.array_index] = kp.co[1] * unit_scale
                     frames[frame_index][0][bone_index, 3] = 0 # Set residual
         perfmon.step(f"Collected data from {ob.name} Armature")
-
 
     writer.add_frames(frames)
 
