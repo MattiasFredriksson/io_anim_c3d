@@ -1,6 +1,7 @@
 import bpy
 import numpy as np
 from .c3d.c3d import Writer
+from . import c3d_patch
 from . perfmon import PerfMon
 
 def export_c3d(filepath):
@@ -20,13 +21,20 @@ def export_c3d(filepath):
 
     perfmon.level_up(f'Collecting labels', True)
     #Initialize a list of bone names to keep track of the order of bones
-    bone_names = []
-    bone_count = 0
-    for obj in scene.objects:
-        if obj.type == 'ARMATURE':
-            for bone in obj.pose.bones:
-                bone_names.append(bone.name)
-                bone_count += 1
+
+    labels = []
+    label_count = 0
+    for obj in bpy.context.scene.objects:
+        if obj.type == 'ARMATURE' and obj.animation_data is not None and obj.animation_data.action is not None:
+            for fcu in obj.animation_data.action.fcurves:
+                data_path_split = fcu.data_path.split('"')
+                if len(data_path_split) <= 1:
+                    continue
+                bone_name = data_path_split[1]
+                if bone_name not in labels:
+                    labels.append(bone_name)
+                    label_count += 1
+
     perfmon.level_down(f'Collecting labels finished')
     
     unit_scale = get_unit_scale() * 1000 # Convert to millimeters TODO: Add unit setting
@@ -36,7 +44,7 @@ def export_c3d(filepath):
     # Create frames data structure and fill it with default values
     frame_count = frame_end-frame_start
 
-    points = np.zeros((bone_count, 5), np.float32)
+    points = np.zeros((label_count, 5), np.float32)
     points[:, 3] = -1  # Set residual to -1
 
     analog = np.zeros((0, 0), dtype=np.float32)
@@ -53,22 +61,22 @@ def export_c3d(filepath):
             if len(data_path_split) <= 1:
                 continue
             bone_name = data_path_split[1]
+            bone_index = labels.index(bone_name)
 
-            if bone_name in bone_names:
-                bone_index = bone_names.index(bone_name)
-                for kp in fcu.keyframe_points:
-                    frame_index = int(kp.co[0]) - frame_start
-                    if 0 <= frame_index < frame_count:
-                        # Fill in points with keyframe value at the appropriate position
-                        frames[frame_index][0][bone_index, fcu.array_index] = kp.co[1] * unit_scale
-                        frames[frame_index][0][bone_index, 3] = 0 # Set residual
+            for kp in fcu.keyframe_points:
+                frame_index = int(kp.co[0]) - frame_start
+                if 0 <= frame_index < frame_count:
+                    # Fill in points with keyframe value at the appropriate position
+                    frames[frame_index][0][bone_index, fcu.array_index] = kp.co[1] * unit_scale
+                    frames[frame_index][0][bone_index, 3] = 0 # Set residual
+        perfmon.step(f"Collected data from {ob.name} Armature")
 
 
     writer.add_frames(frames)
 
     perfmon.level_down(f'Collecting frame data finished')
 
-    writer.set_point_labels(bone_names)
+    writer.set_point_labels(labels)
     # writer.set_analog_labels([])
 
     # Save the C3D file
