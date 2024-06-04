@@ -1,8 +1,15 @@
+import mathutils
 import numpy as np
 from .c3d.c3d import Writer
 from . perfmon import PerfMon
 
-def export_c3d(filepath, context):
+def export_c3d(filepath, context, 
+            use_manual_orientation = False,
+            axis_forward='-Z',
+            axis_up='Y',
+            global_scale=1.0):
+    
+    from bpy_extras.io_utils import axis_conversion
 
     perfmon = PerfMon()
     perfmon.level_up(f'Exporting: {filepath}', True)
@@ -13,7 +20,6 @@ def export_c3d(filepath, context):
     frame_end = scene.frame_end+1
     frame_rate = scene.render.fps
 
-    # point_count = sum(len(obj.pose.bones) for obj in scene.objects if obj.type == 'ARMATURE')
 
     writer = Writer(frame_rate,0)
 
@@ -34,8 +40,6 @@ def export_c3d(filepath, context):
                     label_count += 1
 
     perfmon.level_down(f'Collecting labels finished')
-    
-    unit_scale = get_unit_scale(scene) * 1000 # Convert to millimeters TODO: Add unit setting
 
     perfmon.level_up(f'Collecting frame data', True)
 
@@ -65,13 +69,35 @@ def export_c3d(filepath, context):
                 frame_index = int(kp.co[0]) - frame_start
                 if 0 <= frame_index < frame_count:
                     # Fill in points with keyframe value at the appropriate position
-                    frames[frame_index][0][bone_index, fcu.array_index] = kp.co[1] * unit_scale
+                    frames[frame_index][0][bone_index, fcu.array_index] = kp.co[1]
                     frames[frame_index][0][bone_index, 3] = 0 # Set residual
         perfmon.step(f"Collected data from {ob.name} Armature")
 
+    perfmon.level_down(f'Collecting frame data finished')
+
+    perfmon.level_up(f'Applying transformation', True)
+
+    # Scale and orientation
+    unit_scale = get_unit_scale(scene) * 1000 # Convert to millimeters TODO: Add unit setting
+    scale = global_scale * unit_scale
+
+    if use_manual_orientation:
+        global_orient = axis_conversion(to_forward=axis_forward, to_up=axis_up)
+        global_orient = global_orient @ mathutils.Matrix.Scale(scale, 3)
+    else:
+        global_orient = mathutils.Matrix.Scale(scale,3)
+    # Convert orientation to a numpy array (3x3 rotation matrix).
+    global_orient = np.array(global_orient)
+
+    # Orient and scale point data
+    for frame in frames:
+        for bone in frame[0]:
+            bone[:3] = np.matmul(global_orient, bone[:3])
+
+    perfmon.level_down(f'Transformations applied')
+
     writer.add_frames(frames)
 
-    perfmon.level_down(f'Collecting frame data finished')
 
     writer.set_point_labels(labels)
     # writer.set_analog_labels([])
