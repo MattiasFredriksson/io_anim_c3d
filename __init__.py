@@ -290,7 +290,7 @@ class ExportC3D(bpy.types.Operator):
 
     def execute(self, context):
         from . import c3d_exporter
-        c3d_exporter.export_c3d(self.filepath)
+        c3d_exporter.export_c3d(self.filepath, context)
         return {'FINISHED'}
 
     def invoke(self, context, event):

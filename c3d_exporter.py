@@ -1,15 +1,14 @@
-import bpy
 import numpy as np
 from .c3d.c3d import Writer
 from . perfmon import PerfMon
 
-def export_c3d(filepath):
+def export_c3d(filepath, context):
 
     perfmon = PerfMon()
     perfmon.level_up(f'Exporting: {filepath}', True)
 
     # Get the scene data from Blender
-    scene = bpy.context.scene
+    scene = context.scene
     frame_start = scene.frame_start
     frame_end = scene.frame_end+1
     frame_rate = scene.render.fps
@@ -23,7 +22,7 @@ def export_c3d(filepath):
 
     labels = []
     label_count = 0
-    for obj in bpy.context.scene.objects:
+    for obj in context.scene.objects:
         if obj.type == 'ARMATURE' and obj.animation_data is not None and obj.animation_data.action is not None:
             for fcu in obj.animation_data.action.fcurves:
                 data_path_split = fcu.data_path.split('"')
@@ -36,7 +35,7 @@ def export_c3d(filepath):
 
     perfmon.level_down(f'Collecting labels finished')
     
-    unit_scale = get_unit_scale() * 1000 # Convert to millimeters TODO: Add unit setting
+    unit_scale = get_unit_scale(scene) * 1000 # Convert to millimeters TODO: Add unit setting
 
     perfmon.level_up(f'Collecting frame data', True)
 
@@ -50,7 +49,7 @@ def export_c3d(filepath):
     frames = [(points.copy(), analog.copy()) for _ in range(frame_count)]
 
     # Process each object in the scene
-    for ob in bpy.context.scene.objects:
+    for ob in context.scene.objects:
         if ob.type != 'ARMATURE' or ob.animation_data is None or ob.animation_data.action is None:
             continue
         for fcu in ob.animation_data.action.fcurves:
@@ -84,9 +83,8 @@ def export_c3d(filepath):
     perfmon.level_down("Export finished.")
 
 
-def get_unit_scale():
+def get_unit_scale(scene):
     # Determine the unit scale to convert to meters
-    scene = bpy.context.scene
     unit_scale = scene.unit_settings.scale_length
     if scene.unit_settings.system == 'METRIC':
         unit_conversion_factor = unit_scale
