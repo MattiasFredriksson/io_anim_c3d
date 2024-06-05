@@ -21,21 +21,20 @@ def export_c3d(filepath, context,
     frame_end = scene.frame_end+1
     frame_rate = scene.render.fps
 
-
     writer = Writer(frame_rate,0)
 
     perfmon.level_up(f'Collecting labels', True)
     #Initialize a list of bone names to keep track of the order of bones
 
-    curve_names = []
-    label_count = 0
+    curve_names = set()
+
     for obj in context.scene.objects:
         if obj.type == 'ARMATURE' and obj.animation_data is not None and obj.animation_data.action is not None:
             for fcu in obj.animation_data.action.fcurves:
-                bone_name = fcu.data_path
-                if bone_name not in curve_names:
-                    curve_names.append(bone_name)
-                    label_count += 1
+                curve_names.add(fcu.data_path)
+
+    label_count = len(curve_names)
+    curve_names = list(curve_names)
 
     perfmon.level_down(f'Collecting labels finished')
 
@@ -70,9 +69,6 @@ def export_c3d(filepath, context,
     # Scale and orientation
     unit_scale = get_unit_scale(scene) * 1000 # Convert to millimeters TODO: Add unit setting
     scale = global_scale * unit_scale
-
-
-    
 
     # Orient and scale point data
     if use_manual_orientation:
