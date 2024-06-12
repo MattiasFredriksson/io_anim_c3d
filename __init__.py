@@ -58,6 +58,8 @@ if "bpy" in locals():
         importlib.reload(c3d_parse_dictionary)
     if "c3d_importer" in locals():
         importlib.reload(c3d_importer)
+    if "c3d_exporter" in locals():
+        importlib.reload(c3d_exporter)
 
 import bpy # type: ignore
 from bpy.props import ( # type: ignore
@@ -278,11 +280,120 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
             return {'FINISHED'}
         else:
             return c3d_importer.load(self, context, filepath=self.filepath, **keywords)
+        
+# Exporter
+@orientation_helper(axis_forward='-Z', axis_up='Y')
+class ExportC3D(bpy.types.Operator):
+    bl_idname = "export_scene.c3d"
+    bl_label = "Export C3D"
+
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH") # type: ignore
+
+    # -----
+    # Transformation settings (included to allow manual modification of spatial data in the loading process).
+    # -----
+    global_scale: FloatProperty(
+        name="Scale",
+        description="Scaling factor applied to geometric (spatial) data, multiplied with other embedded factors",
+        min=0.001, max=1000.0,
+        default=1.0,
+    ) # type: ignore
+
+    use_manual_orientation: BoolProperty(
+        name="Manual Orientation",
+        description="Specify orientation manually rather then use blenders defaults",
+        default=False,
+    ) # type: ignore
+
+    def draw(self, context):
+        pass
+
+    def execute(self, context):
+        keywords = self.as_keywords(ignore=("filter_glob", "directory", "ui_tab", "filepath", "files"))
+
+        from . import c3d_exporter
+        c3d_exporter.export_c3d(self.filepath, context, **keywords)
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+def menu_func_export(self, context):
+    self.layout.operator(ExportC3D.bl_idname, text="C3D (.c3d)")
+
+def register():
+    bpy.utils.register_class(ExportC3D)
+    bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
+
+def unregister():
+    bpy.utils.unregister_class(ExportC3D)
+    bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
 
 
 #######################
 # Panels
 ######################
+
+## Export
+
+class C3D_PT_export_transform(bpy.types.Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+    bl_label = "Transform"
+    bl_parent_id = "FILE_PT_operator"
+
+    @classmethod
+    def poll(cls, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        return operator.bl_idname == "EXPORT_SCENE_OT_c3d"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False  # No animation.
+
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        layout.prop(operator, "global_scale")
+
+
+class C3D_PT_export_transform_manual_orientation(bpy.types.Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+    bl_label = "Manual Orientation"
+    bl_parent_id = "C3D_PT_export_transform"
+
+    @classmethod
+    def poll(cls, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        return operator.bl_idname == "EXPORT_SCENE_OT_c3d"
+
+    def draw_header(self, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        self.layout.prop(operator, "use_manual_orientation", text="")
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False  # No animation.
+
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        layout.enabled = operator.use_manual_orientation
+
+        layout.prop(operator, "axis_forward")
+        layout.prop(operator, "axis_up")
+
+## Import
 
 class C3D_PT_action(bpy.types.Panel):
     bl_space_type = 'FILE_BROWSER'
@@ -473,8 +584,8 @@ class WM_FH_C3D_PT_drag_and_drop(bpy.types.FileHandler):
 def menu_func_import(self, context):
     self.layout.operator(ImportC3D.bl_idname, text="C3D (.c3d)")
 
-# def menu_func_export(self, context):
-#    self.layout.operator(ExportC3D.bl_idname, text="C3D (.c3d)")
+def menu_func_export(self, context):
+   self.layout.operator(ExportC3D.bl_idname, text="C3D (.c3d)")
 
 #######################
 # Register Operator
@@ -489,8 +600,10 @@ classes = (
     C3D_PT_import_transform_manual_orientation,
     C3D_PT_import_frame_rate,
     C3D_PT_debug,
+    ExportC3D,
+    C3D_PT_export_transform,
+    C3D_PT_export_transform_manual_orientation,
     WM_FH_C3D_PT_drag_and_drop,
-    # ExportC3D,
 )
 
 
@@ -499,12 +612,12 @@ def register():
         bpy.utils.register_class(cl)
 
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
-    # bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
+    bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
 
 
 def unregister():
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
-    # bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
+    bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
 
     for cl in classes:
         bpy.utils.unregister_class(cl)
