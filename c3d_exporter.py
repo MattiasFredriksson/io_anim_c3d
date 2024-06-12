@@ -27,12 +27,14 @@ def export_c3d(filepath, context,
     perfmon.level_up(f'Collecting labels', True)
     #Initialize a list of bone names to keep track of the order of bones
 
-    curve_names = set()
+    curve_names = []
 
     for obj in context.scene.objects:
         if obj.type == 'ARMATURE' and obj.animation_data is not None and obj.animation_data.action is not None:
             for fcu in obj.animation_data.action.fcurves:
-                curve_names.add(fcu.data_path)
+                curve_names.append(fcu.data_path)
+
+    curve_names = list(dict.fromkeys(curve_names))
 
     label_count = len(curve_names)
     curve_names = list(curve_names)
