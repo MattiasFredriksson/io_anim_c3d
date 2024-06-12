@@ -61,6 +61,8 @@ def load(operator, context, filepath="",
     perfmon = PerfMon()
     perfmon.level_up('Importing: %s ...' % file_id, True)
 
+    unlabeled_armature = None
+
     # Open file and read .c3d parameter headers
     with C3DParseDictionary(filepath) as parser:
         if print_file:
@@ -100,6 +102,10 @@ def load(operator, context, filepath="",
             if not parsed_screen_param:
                 operator.report({'INFO'}, 'Unable to parse X/Y_SCREEN information for POINT data, ' +
                                           'manual adjustment to orientation may be necessary.')
+                
+        # Create collection
+        collection = bpy.data.collections.new(name=file_name)
+        context.scene.collection.children.link(collection)
 
         # Read labels, remove labels matching hard-coded criteria
         # regarding the software used to generate the file.
@@ -168,6 +174,10 @@ def load(operator, context, filepath="",
             if create_armature:
                 final_labels = [fc_grp.name for fc_grp in action.groups]
                 arm_obj = create_armature_object(context, armature_name, 'BBONE')
+                if armature_name == "UNLABELED":
+                    unlabeled_armature = arm_obj
+
+                collection.objects.link(arm_obj)
                 add_empty_armature_bones(context, arm_obj, final_labels, bone_size)
                 # Set the width of the bbones.
                 for bone in arm_obj.data.bones:
@@ -181,22 +191,10 @@ def load(operator, context, filepath="",
         bpy.context.view_layer.update()
 
         change_mode('POSE')
-        hide_object("UNLABELED")
+        if unlabeled_armature:
+            unlabeled_armature.hide_set(True)
 
         return {'FINISHED'}
-
-# Function to hide an armature in the viewport
-def hide_object(object_name):
-    # Ensure the object exists
-    if object_name in bpy.data.objects:
-        obj = bpy.data.objects[object_name]
-        # Hide the object in the viewport
-        obj.hide_set(True)
-        print(f"Object '{object_name}' has been hidden in the viewport.")
-    else:
-        print(f"Object '{object_name}' does not exist.")
-        
-    bpy.context.view_layer.update()
 
 def get_actor_masks(labels):
     """
@@ -352,8 +350,6 @@ def create_armature_object(context, name, display_type='OCTAHEDRAL'):
 
     arm_obj = bpy.data.objects.new(name=name, object_data=arm_data)
 
-    # Instance in scene.
-    context.view_layer.active_layer_collection.collection.objects.link(arm_obj)
     return arm_obj
 
 
