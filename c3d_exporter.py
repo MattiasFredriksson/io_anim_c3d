@@ -3,6 +3,7 @@ import mathutils
 import numpy as np
 from .c3d.c3d import Writer
 from . perfmon import PerfMon
+import bpy
 
 def export_c3d(filepath, context, 
             use_manual_orientation = False,
@@ -91,6 +92,14 @@ def export_c3d(filepath, context,
     labels = [name.split('"')[1] for name in curve_names]
     writer.set_point_labels(labels)
     # writer.set_analog_labels([])
+
+    #Meta data
+    manufacturer = writer.get_create("MANUFACTURER")
+    manufacturer.add_str("COMPANY", "", "Blender Foundation")
+    manufacturer.add_str("SOFTWARE", "", "Blender")
+    version = bpy.app.version
+    version_str = f"{version[0]}.{version[1]}.{version[2]}"
+    manufacturer.add_str("VERSION_LABEL", "", version_str)
 
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
