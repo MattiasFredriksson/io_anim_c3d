@@ -564,8 +564,8 @@ class C3D_PT_debug(bpy.types.Panel):
 
         layout.prop(operator, "print_file")
 
-class C3D_PT_drag_and_drop(bpy.types.FileHandler):
-    bl_idname = "drag_and_drop.c3d"
+class WM_FH_C3D_PT_drag_and_drop(bpy.types.FileHandler):
+    bl_idname = "WM_FH_drag_and_drop"
     bl_label = "Import C3D"
     bl_import_operator = "import_anim.c3d"
     bl_file_extensions = ".c3d"
@@ -600,10 +600,10 @@ classes = (
     C3D_PT_import_transform_manual_orientation,
     C3D_PT_import_frame_rate,
     C3D_PT_debug,
-    C3D_PT_drag_and_drop,
     ExportC3D,
     C3D_PT_export_transform,
     C3D_PT_export_transform_manual_orientation,
+    WM_FH_C3D_PT_drag_and_drop,
 )
 
 
