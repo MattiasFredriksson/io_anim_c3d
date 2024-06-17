@@ -188,6 +188,9 @@ def load(operator, context, filepath="",
 
         perfmon.level_down("Import finished.")
 
+        # Metadata
+        read_metadata(parser, collection)
+
         bpy.context.view_layer.update()
 
         change_mode('POSE')
@@ -195,6 +198,39 @@ def load(operator, context, filepath="",
             unlabeled_armature.hide_set(True)
 
         return {'FINISHED'}
+
+def read_metadata(parser, collection):
+    metadata = bpy.data.collections.new(name="Metadata")
+    collection.children.link(metadata)
+
+    # Timecode
+    group = parser.get_group("TIMECODE");
+    if group is not None:
+        timecode = bpy.data.objects.new("TIMECODE", None)
+        metadata.objects.link(timecode)
+
+        timecode["DROP_FRAMES"] = bool(group.get_int8("DROP_FRAMES"))
+
+        field_numbers = group.get("FIELD_NUMBERS").int_array.flatten()
+        field_numbers = [int(num) for num in field_numbers]
+        timecode["FIELD_NUMBERS"] = field_numbers
+
+        offsets = group.get("OFFSETS").int_array.flatten()
+        offsets = [int(num) for num in offsets]
+        timecode["OFFSETS"] = offsets
+
+        timecode["STANDARD"] = group.get_string("STANDARD")
+
+        subframesperframe = group.get("SUBFRAMESPERFRAME").int_array.flatten()
+        subframesperframe = [int(num) for num in subframesperframe]
+        timecode["SUBFRAMESPERFRAME"] = subframesperframe
+
+        timecodes = group.get("TIMECODES").int_array.flatten()
+        timecodes = list(map(str, timecodes))
+        timecodes = ':'.join(timecodes)
+        timecode["TIMECODES"] = timecodes
+
+        timecode["USED"] = bool(group.get_int16("USED"))
 
 def get_actor_masks(labels):
     """
