@@ -306,9 +306,14 @@ def read_data(parser, blen_curves, labels, point_mask, global_orient,
     ##
     # Time to generate keyframes.
     perfmon.level_up('Keyframing POINT data..', True)
+
     # Number of valid keys for each label.
     nkeys = np.sum(valid_samples, axis=0)
     frame_range = np.arange(0, nframes)
+
+    # Pre-compute frame indices for each label
+    frame_indices_all = [frame_range[valid_samples[:, label_ind]] for label_ind in range(len(blen_curves))]
+
     # Iterate each group (tracker label).
     for label_ind, fc_set in enumerate(blen_curves):
         # Create keyframes.
@@ -316,17 +321,23 @@ def read_data(parser, blen_curves, labels, point_mask, global_orient,
         for fc in fc_set:
             fc.keyframe_points.add(nlabel_keys)
 
-        # Iterate valid frames and insert keyframes.
-        frame_indices = frame_range[valid_samples[:, label_ind]]
+        # Get the frame indices for this label
+        frame_indices = frame_indices_all[label_ind]
+
+        # Prepare keyframe data for all dimensions at once
+        keyframes = np.empty((nlabel_keys, len(fc_set), 2), dtype=np.float32)
+        keyframes[:, :, 0] = frame_indices[:, np.newaxis] * conv_fac_frame_rate
 
         for dim, fc in enumerate(fc_set):
-            keyframes = np.empty((nlabel_keys, 2), dtype=np.float32)
-            keyframes[:, 0] = frame_indices * conv_fac_frame_rate
-            keyframes[:, 1] = point_frames[frame_indices, dim, label_ind]
-            fc.keyframe_points.foreach_set('co', keyframes.ravel())
+            keyframes[:, dim, 1] = point_frames[frame_indices, dim, label_ind]
 
+        # Set the keyframe points for each fcurve
+        for dim, fc in enumerate(fc_set):
+            fc.keyframe_points.foreach_set('co', keyframes[:, dim].ravel())
+
+    # Set interpolation if needed
     if interpolation != 'BEZIER':  # Bezier is default
-        for label_ind, fc_set in enumerate(blen_curves):
+        for fc_set in blen_curves:
             for fc in fc_set:
                 for kf in fc.keyframe_points:
                     kf.interpolation = interpolation
