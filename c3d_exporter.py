@@ -95,13 +95,9 @@ def export_c3d(filepath, context,
     writer.set_point_labels(labels)
     # writer.set_analog_labels([])
 
-    #Meta data
-    manufacturer = writer.get_create("MANUFACTURER")
-    manufacturer.add_str("COMPANY", "", "Blender Foundation")
-    manufacturer.add_str("SOFTWARE", "", "Blender")
-    version = bpy.app.version
-    version_str = f"{version[0]}.{version[1]}.{version[2]}"
-    manufacturer.add_str("VERSION_LABEL", "", version_str)
+    perfmon.level_up(f'Write metadata', True)
+    write_metadata(writer)
+    perfmon.level_down(f'Done writing metadata')
 
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
@@ -111,6 +107,78 @@ def export_c3d(filepath, context,
 
     perfmon.level_down("Export finished.")
 
+
+def write_metadata(writer, collection_name="Metadata"):
+    # Find the Metadata collection
+    metadata_collection = None
+    for collection in bpy.data.collections:
+        if collection.name == collection_name:
+            metadata_collection = collection
+            break
+
+    if metadata_collection is None:
+        print(f"Collection '{collection_name}' not found.")
+        return
+    
+    write_manufacturer(writer)
+    write_timecode(writer, metadata_collection)
+
+def write_manufacturer(writer):
+    manufacturer = writer.get_create("MANUFACTURER")
+    manufacturer.add_str("COMPANY", "", "Blender Foundation")
+    manufacturer.add_str("SOFTWARE", "", "Blender")
+    version = bpy.app.version
+    version_str = f"{version[0]}.{version[1]}.{version[2]}"
+    manufacturer.add_str("VERSION_LABEL", "", version_str)
+
+def write_timecode(writer, metadata_collection):
+    # Find the timecode object in the Metadata collection
+    timecode_object = None
+    for obj in metadata_collection.objects:
+        if obj.name == "TIMECODE":
+            timecode_object = obj
+            break
+
+    if timecode_object is None:
+        print("TIMECODE object not found in the Metadata collection.")
+        return
+
+    group = writer.get_create("TIMECODES")
+
+     # Write DROP_FRAMES as a signed 8-bit integer
+    group.add('DROP_FRAMES', 'Does the timecode drop frames?', 1, '<b', int(timecode_object["DROP_FRAMES"]))
+
+    # Write FIELD_NUMBERS as an array of signed 16-bit integers
+    field_numbers = timecode_object["FIELD_NUMBERS"]
+    field_numbers = np.array(field_numbers, dtype=np.int16)
+    # Ensure the array is correctly formatted with the required dimensions
+    field_numbers = field_numbers.reshape(-1, 1)
+    group.add_array('FIELD_NUMBERS', 'Field numbers', field_numbers)
+
+    # Write OFFSETS as an array of signed 16-bit integers
+    offsets = timecode_object["OFFSETS"]
+    offsets = np.array(offsets, dtype=np.int16)
+    offsets = offsets.reshape(-1, 1)
+    group.add_array('OFFSETS', 'Offsets', offsets)
+
+    # Write STANDARD as a string
+    group.add_str('STANDARD', 'Timecode standard', timecode_object["STANDARD"])
+
+    # Write SUBFRAMESPERFRAME as an array of signed 16-bit integers
+    subframesperframe = timecode_object["SUBFRAMESPERFRAME"]
+    subframesperframe = np.array(subframesperframe, dtype=np.int16)
+    subframesperframe = subframesperframe.reshape(-1, 1)
+    group.add_array('SUBFRAMESPERFRAME', 'Subframes per frame', subframesperframe)
+
+    # Write TIMECODES as an array of signed 16-bit integers
+    timecodes = timecode_object["TIMECODES"]
+    timecodes = list(map(int, timecodes.split(':')))
+    timecodes = np.array(timecodes, dtype=np.int16)
+    timecodes = timecodes.reshape(-1, 1)
+    group.add_array('TIMECODES', 'Timecodes', timecodes)
+
+    # Write USED as a signed 16-bit integer
+    group.add('USED', 'Is the timecode used?', 2, '<h', int(timecode_object["USED"]))
 
 def get_unit_scale(scene):
     # Determine the unit scale to convert to meters
