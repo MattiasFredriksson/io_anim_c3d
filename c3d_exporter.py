@@ -96,6 +96,7 @@ def export_c3d(filepath, context,
     # writer.set_analog_labels([])
 
     perfmon.level_up(f'Write metadata', True)
+
     write_metadata(writer)
     perfmon.level_down(f'Done writing metadata')
 
@@ -143,7 +144,7 @@ def write_timecode(writer, metadata_collection):
         print("TIMECODE object not found in the Metadata collection.")
         return
 
-    group = writer.get_create("TIMECODES")
+    group = writer.get_create("TIMECODE")
 
      # Write DROP_FRAMES as a signed 8-bit integer
     group.add('DROP_FRAMES', 'Does the timecode drop frames?', 1, '<b', int(timecode_object["DROP_FRAMES"]))
