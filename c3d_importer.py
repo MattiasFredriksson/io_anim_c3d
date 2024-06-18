@@ -122,6 +122,8 @@ def load(operator, context, filepath="",
         else:
             armatures[file_name] = np.ones(np.shape(labels), bool)
 
+        cached_frames = list(parser.reader.read_frames(copy=True))
+
         for armature_name, armature_mask in armatures.items():
 
             point_mask = np.logical_and(software_mask, armature_mask)
@@ -147,7 +149,7 @@ def load(operator, context, filepath="",
             blen_curves = np.array(blen_curves_arr).reshape(nlabels, 3)
 
             # Load
-            read_data(parser, blen_curves, unique_labels, point_mask, global_orient,
+            read_data(cached_frames, blen_curves, unique_labels, point_mask, global_orient,
                     first_frame, nframes, conv_fac_frame_rate,
                     interpolation, max_residual,
                     perfmon)
@@ -270,7 +272,7 @@ def read_events(operator, parser, action, conv_fac_frame_rate):
         operator.report({'WARNING'}, str(e))
 
 
-def read_data(parser, blen_curves, labels, point_mask, global_orient,
+def read_data(frames, blen_curves, labels, point_mask, global_orient,
               first_frame, nframes, conv_fac_frame_rate,
               interpolation, max_residual,
               perfmon):
@@ -285,7 +287,7 @@ def read_data(parser, blen_curves, labels, point_mask, global_orient,
     ##
     # Start reading POINT blocks (and analog, but analog signals from force plates etc. are not supported).
     perfmon.level_up('Reading POINT data..', True)
-    for i, points, analog in parser.reader.read_frames(copy=False):
+    for i, points, analog in frames:
         index = i - first_frame
         # Apply masked samples.
         points = points[point_mask]
