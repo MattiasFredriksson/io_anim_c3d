@@ -122,6 +122,9 @@ def load(operator, context, filepath="",
         else:
             armatures[file_name] = np.ones(np.shape(labels), bool)
 
+        # Strip actor name from labels
+        labels = np.array([item.split(":", 1)[1] if ":" in item else item for item in labels])
+
         cached_frames = list(parser.reader.read_frames(copy=True))
 
         for armature_name, armature_mask in armatures.items():
@@ -245,19 +248,24 @@ def get_actor_masks(labels):
     A dictionary where keys are actor names and values are point masks.
     """
     actor_masks = {}
+    actors = get_actors(labels)
 
-    for item in labels:
-        actor, _ = item.split(":", 1) if ":" in item else ("UNLABELED", item)
-
-        if actor not in actor_masks:
-            # Create a point mask for this actor
-            if actor == "UNLABELED":
-                point_mask = [":" not in label for label in labels]
-            else:
-                point_mask = [label.startswith(actor + ":") for label in labels]
-            actor_masks[actor] = point_mask
+    for actor in actors:
+        if actor == "UNLABELED":
+            point_mask = [":" not in label for label in labels]
+        else:
+            point_mask = [label.startswith(actor + ":") for label in labels]
+        actor_masks[actor] = point_mask
 
     return actor_masks
+
+def get_actors(labels):
+    unique_actors = set()
+    for item in labels:
+        actor, _ = item.split(":", 1) if ":" in item else ("UNLABELED", item)
+        unique_actors.add(actor)
+    return unique_actors
+
 
 def read_events(operator, parser, action, conv_fac_frame_rate):
     ''' Read events from the loaded c3d file and add them as 'pose_markers' to the action.
