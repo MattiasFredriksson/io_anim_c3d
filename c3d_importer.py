@@ -370,6 +370,10 @@ def read_data(frames, blen_curves, residual_curves, labels, point_mask, global_o
     if interpolation != 'BEZIER':  # Bezier is default
         for fc_set in blen_curves:
             for fc in fc_set:
+                interpolation_enum_arr = [bpy.types.Keyframe.bl_rna.properties["interpolation"].enum_items[interpolation].value] * len(fc.keyframe_points)
+                fc.keyframe_points.foreach_set('interpolation', interpolation_enum_arr)
+                # for kf in fc.keyframe_points:
+                #     kf.interpolation = interpolation
 
     perfmon.level_down('Keyframing Done.')
 
