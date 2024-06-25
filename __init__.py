@@ -153,7 +153,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     ),
         name="Interpolation",
         description="Keyframe interpolation",
-        default='LINEAR'
+        default='BEZIER'
     ) # type: ignore
 
     # It should be noted that the standard states two custom representations:
