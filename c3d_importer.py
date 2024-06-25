@@ -317,17 +317,17 @@ def read_data(frames, blen_curves, residual_curves, labels, point_mask, global_o
         # Extract position coordinates from columns 0:3.
         point_frames[index] = points[:, :3].T
 
-    # for i, fc in enumerate(residual_curves):
-    #     fc.keyframe_points.add(len(frames))
-    #     fc.keyframe_points.foreach_set('co', np.array(residual[i]).ravel())
+    # Create residual curves
+    frame_indices = np.arange(first_frame, first_frame + nframes) * conv_fac_frame_rate
+    linear_enum_values = [bpy.types.Keyframe.bl_rna.properties["interpolation"].enum_items["CONSTANT"].value] * len(frame_indices)
 
     for i, fc in enumerate(residual_curves):
-        frame_indices = np.arange(first_frame, first_frame + nframes) * conv_fac_frame_rate
         keyframe_data = np.zeros((nframes, 2), dtype=np.float32)
         keyframe_data[:, 0] = frame_indices
         keyframe_data[:, 1] = residual[:, i]
         fc.keyframe_points.add(nframes)
         fc.keyframe_points.foreach_set('co', keyframe_data.ravel())
+        fc.keyframe_points.foreach_set('interpolation', linear_enum_values)
 
     # Re-orient and scale the data.
     point_frames = np.matmul(global_orient, point_frames)
