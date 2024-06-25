@@ -319,7 +319,7 @@ def read_data(frames, blen_curves, residual_curves, labels, point_mask, global_o
 
     # Create residual curves
     frame_indices = np.arange(first_frame, first_frame + nframes) * conv_fac_frame_rate
-    linear_enum_values = [bpy.types.Keyframe.bl_rna.properties["interpolation"].enum_items["CONSTANT"].value] * len(frame_indices)
+    constant_enum_arr = [bpy.types.Keyframe.bl_rna.properties["interpolation"].enum_items["CONSTANT"].value] * len(frame_indices)
 
     for i, fc in enumerate(residual_curves):
         keyframe_data = np.zeros((nframes, 2), dtype=np.float32)
@@ -327,7 +327,7 @@ def read_data(frames, blen_curves, residual_curves, labels, point_mask, global_o
         keyframe_data[:, 1] = residual[:, i]
         fc.keyframe_points.add(nframes)
         fc.keyframe_points.foreach_set('co', keyframe_data.ravel())
-        fc.keyframe_points.foreach_set('interpolation', linear_enum_values)
+        fc.keyframe_points.foreach_set('interpolation', constant_enum_arr)
 
     # Re-orient and scale the data.
     point_frames = np.matmul(global_orient, point_frames)
@@ -370,8 +370,6 @@ def read_data(frames, blen_curves, residual_curves, labels, point_mask, global_o
     if interpolation != 'BEZIER':  # Bezier is default
         for fc_set in blen_curves:
             for fc in fc_set:
-                for kf in fc.keyframe_points:
-                    kf.interpolation = interpolation
 
     perfmon.level_down('Keyframing Done.')
 
