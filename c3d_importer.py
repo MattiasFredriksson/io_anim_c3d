@@ -319,15 +319,21 @@ def read_data(frames, blen_curves, residual_curves, labels, point_mask, global_o
 
     # Create residual curves
     frame_indices = np.arange(first_frame, first_frame + nframes) * conv_fac_frame_rate
-    constant_enum_arr = [bpy.types.Keyframe.bl_rna.properties["interpolation"].enum_items["CONSTANT"].value] * len(frame_indices)
+    constant_enum = bpy.types.Keyframe.bl_rna.properties["interpolation"].enum_items["CONSTANT"].value
 
     for i, fc in enumerate(residual_curves):
-        keyframe_data = np.zeros((nframes, 2), dtype=np.float32)
-        keyframe_data[:, 0] = frame_indices
-        keyframe_data[:, 1] = residual[:, i]
-        fc.keyframe_points.add(nframes)
-        fc.keyframe_points.foreach_set('co', keyframe_data.ravel())
-        fc.keyframe_points.foreach_set('interpolation', constant_enum_arr)
+        keyframe_data = []
+        previous_value = None
+        for frame_index, value in zip(frame_indices, residual[:, i]):
+            if previous_value is None or value != previous_value:
+                keyframe_data.append((frame_index, value))
+                previous_value = value
+
+        if keyframe_data:
+            fc.keyframe_points.add(len(keyframe_data))
+            flat_keyframe_data = [item for sublist in keyframe_data for item in sublist]
+            fc.keyframe_points.foreach_set('co', flat_keyframe_data)
+            fc.keyframe_points.foreach_set('interpolation', [constant_enum] * len(keyframe_data))
 
     # Re-orient and scale the data.
     point_frames = np.matmul(global_orient, point_frames)
