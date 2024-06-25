@@ -151,15 +151,17 @@ def load(operator, context, filepath="",
             blen_curves_arr = generate_blend_curves(action, unique_labels, 3, 'pose.bones["%s"].location')
             blen_curves = np.array(blen_curves_arr).reshape(nlabels, 3)
 
+            residual_curves = np.array(generate_blend_curves(action, unique_labels, 1, 'pose.bones["%s"]["residual"]'))
+
             # Load
-            read_data(cached_frames, blen_curves, unique_labels, point_mask, global_orient,
+            read_data(cached_frames, blen_curves, residual_curves, unique_labels, point_mask, global_orient,
                     first_frame, nframes, conv_fac_frame_rate,
                     interpolation, max_residual,
                     perfmon)
 
             # Remove labels with no valid keyframes.
-            if not include_empty_labels:
-                clean_empty_fcurves(action)
+            # if not include_empty_labels:
+            #     clean_empty_fcurves(action)
             # Since we inserted our keyframes in 'FAST' mode, its best to update the fcurves now.
             for fc in action.fcurves:
                 fc.update()
@@ -280,7 +282,7 @@ def read_events(operator, parser, action, conv_fac_frame_rate):
         operator.report({'WARNING'}, str(e))
 
 
-def read_data(frames, blen_curves, labels, point_mask, global_orient,
+def read_data(frames, blen_curves, residual_curves, labels, point_mask, global_orient,
               first_frame, nframes, conv_fac_frame_rate,
               interpolation, max_residual,
               perfmon):
@@ -291,6 +293,7 @@ def read_data(frames, blen_curves, labels, point_mask, global_orient,
     # Generate numpy arrays to store POINT data from each frame before creating keyframes.
     point_frames = np.zeros([nframes, 3, nlabels], dtype=np.float32)
     valid_samples = np.empty([nframes, nlabels], dtype=bool)
+    residual = np.zeros([nframes, nlabels], dtype=np.float32)
 
     ##
     # Start reading POINT blocks (and analog, but analog signals from force plates etc. are not supported).
@@ -300,6 +303,7 @@ def read_data(frames, blen_curves, labels, point_mask, global_orient,
         # Apply masked samples.
         points = points[point_mask]
         # Determine valid samples
+        residual[index] = points[:, 3]
         valid = points[:, 3] >= 0.0
         if max_residual > 0.0:
             valid = np.logical_and(points[:, 3] < max_residual, valid)
@@ -307,6 +311,18 @@ def read_data(frames, blen_curves, labels, point_mask, global_orient,
 
         # Extract position coordinates from columns 0:3.
         point_frames[index] = points[:, :3].T
+
+    # for i, fc in enumerate(residual_curves):
+    #     fc.keyframe_points.add(len(frames))
+    #     fc.keyframe_points.foreach_set('co', np.array(residual[i]).ravel())
+
+    for i, fc in enumerate(residual_curves):
+        frame_indices = np.arange(first_frame, first_frame + nframes) * conv_fac_frame_rate
+        keyframe_data = np.zeros((nframes, 2), dtype=np.float32)
+        keyframe_data[:, 0] = frame_indices
+        keyframe_data[:, 1] = residual[:, i]
+        fc.keyframe_points.add(nframes)
+        fc.keyframe_points.foreach_set('co', keyframe_data.ravel())
 
     # Re-orient and scale the data.
     point_frames = np.matmul(global_orient, point_frames)
