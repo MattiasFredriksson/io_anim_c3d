@@ -160,8 +160,8 @@ def load(operator, context, filepath="",
                     perfmon)
 
             # Remove labels with no valid keyframes.
-            # if not include_empty_labels:
-            #     clean_empty_fcurves(action)
+            if not include_empty_labels:
+                clean_empty_fcurves(action)
             # Since we inserted our keyframes in 'FAST' mode, its best to update the fcurves now.
             for fc in action.fcurves:
                 fc.update()
