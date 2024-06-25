@@ -190,6 +190,11 @@ def load(operator, context, filepath="",
                 for bone in arm_obj.data.bones:
                     bone.bbone_x = bone_radius
                     bone.bbone_z = bone_radius
+                
+                # Add custom properties to pose bones
+                for pose_bone in arm_obj.pose.bones:
+                    pose_bone["residual"] = 0
+
                 # Set the created action as active for the armature.
                 set_action(arm_obj, action, replace=False)
 
