@@ -186,14 +186,16 @@ def load(operator, context, filepath="",
 
                 collection.objects.link(arm_obj)
                 add_empty_armature_bones(context, arm_obj, final_labels, bone_size)
+
+                # Add custom properties to pose bones
+                for pose_bone in arm_obj.pose.bones:
+                    pose_bone["residual"] = 0
+
                 # Set the width of the bbones.
                 for bone in arm_obj.data.bones:
                     bone.bbone_x = bone_radius
                     bone.bbone_z = bone_radius
-                
-                # Add custom properties to pose bones
-                for pose_bone in arm_obj.pose.bones:
-                    pose_bone["residual"] = 0
+                    add_driver(arm_obj, bone, 'residual', 'hide', 'residual < 0')
 
                 # Set the created action as active for the armature.
                 set_action(arm_obj, action, replace=False)
@@ -542,3 +544,17 @@ def clean_empty_fcurves(action):
 
     for curve in empty_curves:
         action.fcurves.remove(curve)
+
+def add_driver(armature, bone, source, target, expression):
+
+    driver = bone.driver_add(target).driver
+    
+    driver.type = 'SCRIPTED'
+    
+    var = driver.variables.new()
+    var.name = 'residual'
+    var.targets[0].id_type = 'OBJECT'
+    var.targets[0].id = armature
+    var.targets[0].data_path = f'pose.bones["{bone.name}"]["{source}"]'
+    
+    driver.expression = expression
