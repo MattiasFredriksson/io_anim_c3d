@@ -1,12 +1,12 @@
-# Alpha Version
+# C3D File Importer for Blender
 # io_anim_c3d
-Blender 2.8x-2.9x addon for importing .c3d files
+Blender addon for importing motion capture data found in .c3d files.
 
 # How to Install
 
 Download
 -------
-1. [Download](https://github.com/MattiasFredriksson/io_anim_c3d/archive/master.zip) the latest source code (for Blender 2.8+).
+1. [Download](https://github.com/MattiasFredriksson/io_anim_c3d/archive/master.zip) the latest source code (intended for latest LTS release, see [release](https://github.com/MattiasFredriksson/io_anim_c3d/releases) section for stable/specific versions).
 
 
 Install from Blender
