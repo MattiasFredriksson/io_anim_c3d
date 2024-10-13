@@ -44,7 +44,7 @@ Code Style
 -------
 - Classes should be in PascalCase
 - Variables and functions should be in snake_case
-- Code needs to be pep8 compliant (_init_ has excemptions due to Blender dependencies).
+- Code needs to be pep8 compliant (\_\_init\_\_ has excemptions due to Blender dependencies).
 
 Addon Tooltip Style
 -------
