@@ -48,7 +48,7 @@ def load(operator, context, filepath="",
     # Load more modules/packages once the importer is used
     from bpy_extras.io_utils import axis_conversion
     from .c3d_parse_dictionary import C3DParseDictionary
-    import perfmon
+    from . import perfmon
 
     # Define the action id from the filename
     file_id = os.path.basename(filepath)

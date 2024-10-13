@@ -84,4 +84,4 @@ def new_monitor(print_output=True) -> PerfMon:
     if not DO_PERFMON or not print_output:
         return NullMon()
     else:
-        return PerfMon
+        return PerfMon()
