@@ -44,7 +44,6 @@ class Zipload:
                 print('Extracted:', fpath)
                 zip.extract(zf, path=out_path)
 
-    
     @staticmethod
     def download_and_extract():
         """ Download and extract all test files.
@@ -72,7 +71,7 @@ class Zipload:
         root_folder = os.path.join(TEST_FOLDER, dn)
         for root, dirs, files in os.walk(root_folder, topdown=False):
             for fn in files:
-                if fn.endswith('.c3d'): 
+                if fn.endswith('.c3d'):
                     yield os.path.join(root, fn)
 
     @staticmethod

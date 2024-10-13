@@ -4,11 +4,10 @@ import unittest
 
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from test.zipload import Zipload
 
 
 class ImportC3DTestSample01(unittest.TestCase):
-    
+
     ZIP_FOLDER = 'sample01'
     ZIP_FILES = \
         [
@@ -21,11 +20,12 @@ class ImportC3DTestSample01(unittest.TestCase):
         ]
 
     def setUpClass():
+        from test.zipload import Zipload
         Zipload.download_and_extract()
 
         objs = []
         actions = []
-        
+
         for file in ImportC3DTestSample01.ZIP_FILES:
 
             # Parse

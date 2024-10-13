@@ -22,10 +22,10 @@
 
 
 # ##### Performance monitor #####
+import time
 
 DO_PERFMON = True
 
-import time
 
 class PerfMon():
     def __init__(self):
@@ -45,8 +45,8 @@ class PerfMon():
             return
         ref_time = self.ref_time[self.level]
         print("\t" * self.level,
-                "\tDone (%f sec)\n" % ((time.process_time() - ref_time) if ref_time is not None else 0.0),
-                sep="")
+              "\tDone (%f sec)\n" % ((time.process_time() - ref_time) if ref_time is not None else 0.0),
+              sep="")
         if message:
             print("\t" * self.level, message, sep="")
         del self.ref_time[self.level]
@@ -62,6 +62,7 @@ class PerfMon():
 
     def message(self, message):
         print("\t" * self.level, message, sep="")
+
 
 class NullMon():
     def __init__(self):

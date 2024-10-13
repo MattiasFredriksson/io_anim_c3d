@@ -4,12 +4,12 @@ import unittest
 
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from test.zipload import Zipload
 
 
 class ImportC3DTestMultipleFiles(unittest.TestCase):
 
     def setUpClass():
+        from test.zipload import Zipload
         Zipload.download_and_extract()
         objs = []
         actions = []

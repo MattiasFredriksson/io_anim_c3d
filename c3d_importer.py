@@ -55,7 +55,7 @@ def load(operator, context, filepath="",
     file_name = os.path.splitext(file_id)[0]
 
     # Monitor performance
-    perfmon =  perfmon.new_monitor(print_output=perf_mon)
+    perfmon = perfmon.new_monitor(print_output=perf_mon)
     perfmon.level_up('Importing: %s ...' % file_id, True)
 
     # Open file and read .c3d parameter headers
