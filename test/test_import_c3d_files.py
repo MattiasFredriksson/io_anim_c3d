@@ -17,7 +17,7 @@ class ImportC3DTestMultipleFiles(unittest.TestCase):
         # Parse files
         for filepath in Zipload.get_c3d_filenames('sample00'):
             # Parse
-            bpy.ops.import_anim.c3d(filepath=filepath, print_file=False)
+            bpy.ops.import_anim.c3d(filepath=filepath, print_file=False, perf_mon=False)
             # Fetch loaded objects
             obj = bpy.context.selected_objects[0]
             objs.append(obj)
@@ -29,12 +29,14 @@ class ImportC3DTestMultipleFiles(unittest.TestCase):
     def test_A_channel_count(self):
         ''' Verify loaded animations has channels
         '''
+        self.assertGreater(len(self.actions), 0)
         for action in self.actions:
             self.assertGreater(len(action.fcurves), 0)
 
     def test_B_keyframe_count(self):
         ''' Verify each channel has keyframes
         '''
+        self.assertGreater(len(self.actions), 0)
         for action in self.actions:
             for i in range(len(action.fcurves)):
                 self.assertGreater(len(action.fcurves[i].keyframe_points), 0)

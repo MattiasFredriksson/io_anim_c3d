@@ -32,7 +32,8 @@ class ImportC3DTestSample01(unittest.TestCase):
             fp = Zipload.get_c3d_path('sample01', file)
             bpy.ops.import_anim.c3d(filepath=fp,
                                     print_file=False,
-                                    include_empty_labels=False)
+                                    include_empty_labels=False,
+                                    perf_mon=False)
             # Fetch loaded objects
             obj = bpy.context.selected_objects[0]
             objs.append(obj)

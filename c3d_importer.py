@@ -42,19 +42,20 @@ def load(operator, context, filepath="",
          include_event_markers=False,
          include_empty_labels=False,
          apply_label_mask=True,
-         print_file=True):
+         print_file=False,
+         perf_mon=True):
 
     # Load more modules/packages once the importer is used
     from bpy_extras.io_utils import axis_conversion
     from .c3d_parse_dictionary import C3DParseDictionary
-    from . perfmon import PerfMon
+    import perfmon
 
     # Define the action id from the filename
     file_id = os.path.basename(filepath)
     file_name = os.path.splitext(file_id)[0]
 
     # Monitor performance
-    perfmon = PerfMon()
+    perfmon =  perfmon.new_monitor(print_output=perf_mon)
     perfmon.level_up('Importing: %s ...' % file_id, True)
 
     # Open file and read .c3d parameter headers

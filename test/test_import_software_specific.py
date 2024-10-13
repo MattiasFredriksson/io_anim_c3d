@@ -15,7 +15,7 @@ class ImportC3DTestVicon(unittest.TestCase):
         FILEPATH = Zipload.get_c3d_path('sample00', 'Vicon Motion Systems', 'TableTennis.c3d')
 
         # Parse file
-        bpy.ops.import_anim.c3d(filepath=FILEPATH, print_file=False)
+        bpy.ops.import_anim.c3d(filepath=FILEPATH, print_file=False, perf_mon=False)
         # Fetch loaded objects
         obj = bpy.context.selected_objects[0]
         ImportC3DTestVicon.obj = obj

@@ -5,10 +5,11 @@
 cd "${0%/*}"
 BLENDER_EXE=$1
 
-echo "Running tests in: $BLENDER_EXE"
+echo "Running tests using: $BLENDER_EXE"
 
 STATUS=0
 for FILEPATH in ./*.py; do
+    echo "Test $FILEPATH"
     eval $BLENDER_EXE -b -noaudio --python "$FILEPATH"
     if [ $? -ne 0 ]; then
         # Track failed evaluation

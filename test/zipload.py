@@ -18,7 +18,6 @@ class Zipload:
         if not os.path.isdir(TEST_FOLDER):
             os.makedirs(TEST_FOLDER)
         for url, target in ZIPS:
-            print(url, target)
             fn = os.path.join(TEST_FOLDER, target)
             if not os.path.isfile(fn):
                 print('Downloading: ', url)

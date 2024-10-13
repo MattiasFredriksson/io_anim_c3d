@@ -203,9 +203,15 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     # Debug settings.
     # -----
     print_file: BoolProperty(
-        name="Print metadata",
+        name="Print Metadata",
         description="Print file metadata to console",
         default=False,
+    )
+
+    perf_mon: BoolProperty(
+        name="Monitor Performance",
+        description="Print import timings to console",
+        default=True,
     )
 
     def draw(self, context):
