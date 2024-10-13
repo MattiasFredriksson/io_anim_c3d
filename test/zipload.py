@@ -5,7 +5,7 @@ import tempfile
 import urllib.request
 import zipfile
 
-TEST_FOLDER = os.path.join(tempfile.gettempdir(), 'testfiles')
+TEST_FOLDER = os.path.join(tempfile.gettempdir(), 'io_anim_c3d', 'testfiles')
 ZIPS = (
     ('https://www.c3d.org/data/Sample00.zip', 'sample00.zip'),
     ('https://www.c3d.org/data/Sample01.zip', 'sample01.zip'),
