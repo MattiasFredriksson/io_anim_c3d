@@ -1,10 +1,11 @@
 import io
 import os
 import shutil
+import tempfile
 import urllib.request
 import zipfile
 
-TEST_FOLDER = os.path.join(os.path.dirname(__file__), 'testfiles')
+TEST_FOLDER = os.path.join(tempfile.gettempdir(), 'testfiles')
 ZIPS = (
     ('https://www.c3d.org/data/Sample00.zip', 'sample00.zip'),
     ('https://www.c3d.org/data/Sample01.zip', 'sample01.zip'),
