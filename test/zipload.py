@@ -4,19 +4,21 @@ import shutil
 import urllib.request
 import zipfile
 
-TEST_FOLDER = os.path.join(__file__, 'testfiles')
+TEST_FOLDER = os.path.join(os.path.dirname(__file__), 'testfiles')
 ZIPS = (
     ('https://www.c3d.org/data/Sample00.zip', 'sample00.zip'),
-    ('https://www.c3d.org/data/sample01.zip', 'sample01.zip'),
+    ('https://www.c3d.org/data/Sample01.zip', 'sample01.zip'),
 )
 
 
 class Zipload:
+
     @staticmethod
     def download():
         if not os.path.isdir(TEST_FOLDER):
             os.makedirs(TEST_FOLDER)
         for url, target in ZIPS:
+            print(url, target)
             fn = os.path.join(TEST_FOLDER, target)
             if not os.path.isfile(fn):
                 print('Downloading: ', url)
@@ -42,13 +44,49 @@ class Zipload:
                 print('Extracted:', fpath)
                 zip.extract(zf, path=out_path)
 
+    
     @staticmethod
-    def _c3ds(zf):
+    def download_and_extract():
+        """ Download and extract all test files.
+        """
+        Zipload.download()
+        for url, target in ZIPS:
+            Zipload.extract(target)
+
+    @staticmethod
+    def get_compressed_filenames(zf) -> list[str]:
+        """ Find all .c3d files in the specified .zip file.
+        """
         with zipfile.ZipFile(os.path.join(TEST_FOLDER, zf)) as z:
             return [i for i in z.filelist
                     if i.filename.lower().endswith('.c3d')]
 
     @staticmethod
-    def _get(zf, fn):
+    def get_c3d_filenames(dn: str):
+        """ Find and iterate all .c3d files in the specified folder.
+
+        Args
+        ----
+        dn: Folder/directory name.
+        """
+        root_folder = os.path.join(TEST_FOLDER, dn)
+        for root, dirs, files in os.walk(root_folder, topdown=False):
+            for fn in files:
+                if fn.endswith('.c3d'): 
+                    yield os.path.join(root, fn)
+
+    @staticmethod
+    def get_c3d_path(*args):
+        return os.path.join(TEST_FOLDER, *args)
+
+    @staticmethod
+    def read_c3d(zf: str, fn: str) -> io.BytesIO:
+        """ Access a IO stream for the specified file in the .zip folder.
+
+        Args
+        ----
+        zf: Name of the zipfile containing the file.
+        fn: Filename to read within the zipfile.
+        """
         with zipfile.ZipFile(os.path.join(TEST_FOLDER, zf)) as z:
             return io.BytesIO(z.open(fn).read())

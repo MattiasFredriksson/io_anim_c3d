@@ -16,11 +16,14 @@ for FILEPATH in ./*.py; do
     fi
 done
 
+echo ""
+echo "-----------------"
 if [ $STATUS -eq 0 ]; then
-    echo "-----------------"
     echo "Success: All Passed!!!"
-    echo "-----------------"
+else
+    echo "Test(s) Failed..."
 fi
+echo "-----------------"
 
 # Terminate with failed status
 exit $STATUS
