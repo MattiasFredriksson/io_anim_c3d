@@ -106,7 +106,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     # Primary import settings
     # -----
     adapt_frame_rate: BoolProperty(
-        name="Frame rate",
+        name="Frame Rate",
         description="Adjust keyframes to match the sample rate of the current Blender scene. " +
                     "If False, frames will be inserted in 1 frame increments",
         default=True,
@@ -114,20 +114,20 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
 
     fake_user: BoolProperty(
         name="Fake User",
-        description="Set the fake user flag for imported action sequence(s) " +
-                    "(fake user flag ensures imported sequences will be saved in the .blend file)",
+        description="Set the fake user flag for imported action sequence(s). " +
+                    "Fake user ensures imported sequences will be saved even if unused",
         default=False,
     )
 
     include_event_markers: BoolProperty(
-        name="Include event markers",
-        description="Add labeled events as 'pose markers' to the action sequence. Markers are only visible" +
+        name="Include Event Markers",
+        description="Add labeled events as 'pose markers' to the action sequence. Markers are only visible " +
                     "if the setting: Marker > Show Pose Markers is enabled in the Action Editor",
         default=True,
     )
 
     include_empty_labels: BoolProperty(
-        name="Include empty labels",
+        name="Include Empty Labels",
         description="Include channels for POINT labels without valid keyframes",
         default=False,
     )
@@ -138,7 +138,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     interpolation: EnumProperty(items=(
         ('CONSTANT', "Constant", "Constant (or no interpolation)"),
         ('LINEAR', "Linear", "Linear interpolation"),
-        ('BEZIER', "Bezier", "Smooth interpolation between A and B, with some control over curve shape"),
+        ('BEZIER', "Bezier", "Smooth interpolation with some control over curve shape"),
         # ('SINE', "Sinusoidal", "Sinusoidal easing (weakest, almost linear but with a slight curvature)"),
         ('QUAD', "Quadratic", "Quadratic easing"),
         ('CUBIC', "Cubic", "Cubic easing"),
@@ -172,7 +172,7 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
     # -----
     create_armature: BoolProperty(
         name="Create Armature",
-        description="Generate an armature to display the animated point cloud",
+        description="Create an armature object to display markers in the animated point cloud",
         default=True,
     )
 
