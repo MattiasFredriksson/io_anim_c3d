@@ -4,20 +4,14 @@ Blender addon for importing motion capture data found in .c3d files.
 
 # How to Install
 
-Download
--------
 1. [Download](https://github.com/MattiasFredriksson/io_anim_c3d/archive/master.zip) the latest version of `io_anim_c3d` from source code (intended for latest LTS release, see [release](https://github.com/MattiasFredriksson/io_anim_c3d/releases) section for stable/specific versions).
-
-
-Installation
--------
-1. Open Blender
-2. Open the Edit->Preferences window.
-3. Go to the 'Add-ons' tab.
-4. Click the 'Install...' button.
-5. Navigate to the folder containing the downloaded .zip file and double-click the file.
-6. Enable the addon 'Import-Export: C3D format' in the addon window.
-7. Not there? Use the refresh button, restart blender, google how to install add-ons, or visit [docs.blender.org](https://docs.blender.org/manual/en/latest/editors/preferences/addons.html).
+2. Open Blender
+3. Open the Edit->Preferences window.
+4. Go to the 'Add-ons' tab.
+5. Click the 'Install...' button.
+6. Navigate to the folder containing the downloaded .zip file and double-click the file.
+7. Enable the addon 'Import-Export: C3D format' in the addon window.
+8. Not there? Use the refresh button, restart blender, google how to install add-ons, or visit [docs.blender.org](https://docs.blender.org/manual/en/latest/editors/preferences/addons.html).
 
 
 # How to Use
