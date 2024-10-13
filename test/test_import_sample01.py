@@ -2,31 +2,38 @@ import bpy
 import os
 import unittest
 
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
 
 class ImportC3DTestSample01(unittest.TestCase):
 
-    def setUpClass():
-        # Find import directory relative to __file__
-        if '.blend' in __file__:
-            # Fetch path from the text object in bpy.data.texts
-            filename = os.path.basename(__file__)
-            filepath = bpy.data.texts[filename].filepath
-        else:
-            filepath = __file__
-        IMPORT_DIR = os.path.join(os.path.dirname(filepath), '.\\testfiles\\sample01')
+    ZIP_FOLDER = 'sample01'
+    ZIP_FILES = \
+        [
+         'Eb015pi.c3d',
+         'Eb015pr.c3d',
+         'Eb015vi.c3d',
+         'Eb015vr.c3d',
+         'Eb015si.c3d',
+         'Eb015sr.c3d'
+        ]
 
-        FILES = ['Eb015pi.c3d', 'Eb015pr.c3d', 'Eb015si.c3d', 'Eb015sr.c3d', 'Eb015vi.c3d', 'Eb015vr.c3d']
-        os.chdir(IMPORT_DIR)
+    def setUpClass():
+        from test.zipload import Zipload
+        Zipload.download_and_extract()
 
         objs = []
         actions = []
 
-        # Parse files
-        for file in FILES:
+        for file in ImportC3DTestSample01.ZIP_FILES:
+
             # Parse
-            bpy.ops.import_anim.c3d(filepath=os.path.join(IMPORT_DIR, file),
+            fp = Zipload.get_c3d_path('sample01', file)
+            bpy.ops.import_anim.c3d(filepath=fp,
                                     print_file=False,
-                                    include_empty_labels=False)
+                                    include_empty_labels=False,
+                                    perf_mon=False)
             # Fetch loaded objects
             obj = bpy.context.selected_objects[0]
             objs.append(obj)

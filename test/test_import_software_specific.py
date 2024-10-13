@@ -2,22 +2,20 @@ import bpy
 import os
 import unittest
 
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
 
 class ImportC3DTestVicon(unittest.TestCase):
 
     def setUpClass():
-        # Find import directory relative to __file__
-        if '.blend' in __file__:
-            # Fetch path from the text object in bpy.data.texts
-            filename = os.path.basename(__file__)
-            filepath = bpy.data.texts[filename].filepath
-        else:
-            filepath = __file__
-        IMPORT_DIR = os.path.join(os.path.dirname(filepath), '.\\testfiles\\sample00\\Vicon Motion Systems')
-        FILE = 'TableTennis.c3d'
+        from test.zipload import Zipload
+        Zipload.download_and_extract()
+
+        FILEPATH = Zipload.get_c3d_path('sample00', 'Vicon Motion Systems', 'TableTennis.c3d')
 
         # Parse file
-        bpy.ops.import_anim.c3d(filepath=os.path.join(IMPORT_DIR, FILE), print_file=True)
+        bpy.ops.import_anim.c3d(filepath=FILEPATH, print_file=False, perf_mon=False)
         # Fetch loaded objects
         obj = bpy.context.selected_objects[0]
         ImportC3DTestVicon.obj = obj
