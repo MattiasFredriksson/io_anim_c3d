@@ -46,7 +46,7 @@ Code Style
 - Variables and functions should be in snake_case
 - Code needs to be pep8 compliant (__init__ has excemptions due to Blender dependencies).
 
-Addon Description
+Addon Tooltip Style
 -------
 
 - Addon property names should written with the first letter in each word capatilized.
