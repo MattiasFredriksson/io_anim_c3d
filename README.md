@@ -9,7 +9,7 @@ Download
 1. [Download](https://github.com/MattiasFredriksson/io_anim_c3d/archive/master.zip) the latest version of `io_anim_c3d` from source code (intended for latest LTS release, see [release](https://github.com/MattiasFredriksson/io_anim_c3d/releases) section for stable/specific versions).
 
 
-Install from Blender
+Installation
 -------
 1. Open Blender
 2. Open the Edit->Preferences window.
@@ -17,14 +17,7 @@ Install from Blender
 4. Click the 'Install...' button.
 5. Navigate to the folder containing the downloaded .zip file and double-click the file.
 6. Enable the addon 'Import-Export: C3D format' in the addon window.
-
-
-Install in a Blender add-on folder
--------
-1. Open the .zip file, and move the 'io_anim_c3d' folder to an addon folder used by Blender.
-2. Go to the Add-on section in the Edit->Preferences menu.
-3. Enable the addon named Import-Export: C3D format (or search the Import-Export add-on section).
-4. Not there? Use the refresh button, restart blender, google how to install add-ons or visit [docs.blender.org](https://docs.blender.org/manual/en/latest/editors/preferences/addons.html).
+7. Not there? Use the refresh button, restart blender, google how to install add-ons, or visit [docs.blender.org](https://docs.blender.org/manual/en/latest/editors/preferences/addons.html).
 
 
 # How to Use
