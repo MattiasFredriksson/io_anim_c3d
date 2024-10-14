@@ -54,3 +54,7 @@ Addon Tooltip Style
 
 - Addon property names should written with the first letter in each word capatilized.
 - Don't forget to exclude the dot (.) at the end of the description as it will be added automatically...
+
+# Further Questions?
+
+If there are any questions or suggestions please visit the [issue board](https://github.com/MattiasFredriksson/io_anim_c3d/issues) and make a ticket, hopefully I will be able to answer questions within some reasonable time frame 😄.
