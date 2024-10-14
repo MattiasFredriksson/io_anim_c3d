@@ -36,7 +36,7 @@ Tests
 -------
 Unittests are available under the 'tests/' folder. To run call:
 
-`tests/run.sh \<path or alias to Blender executable\>`
+`tests/run.sh <path or alias to Blender executable>`
 
 Running tests require the addon to be installed to the Blender executable, simplest way to do so is to use the Blender development extension with the same executable as it will configure a symlink to the project, ensuring the test will run with the latest changes to the code.
 
