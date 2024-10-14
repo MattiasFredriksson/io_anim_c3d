@@ -1,30 +1,17 @@
-# Alpha Version
-# io_anim_c3d
-Blender 2.8x-2.9x addon for importing .c3d files
+# C3D File Importer for Blender
+
+[Blender](https://www.blender.org/) addon for importing motion capture data found in .c3d files.
 
 # How to Install
 
-Download
--------
-1. [Download](https://github.com/MattiasFredriksson/io_anim_c3d/archive/master.zip) the latest source code (for Blender 2.8+).
-
-
-Install from Blender
--------
-1. Open Blender
-2. Open the Edit->Preferences window.
-3. Go to the 'Add-ons' tab.
-4. Click the 'Install...' button.
-5. Navigate to the folder containing the downloaded .zip file and double-click the file.
-6. Enable the addon 'Import-Export: C3D format' in the addon window.
-
-
-Install in a Blender add-on folder
--------
-1. Open the .zip file, and move the 'io_anim_c3d' folder to an addon folder used by Blender.
-2. Go to the Add-on section in the Edit->Preferences menu.
-3. Enable the addon named Import-Export: C3D format (or search the Import-Export add-on section).
-4. Not there? Use the refresh button, restart blender, google how to install add-ons or visit [docs.blender.org](https://docs.blender.org/manual/en/latest/editors/preferences/addons.html).
+1. [Download](https://github.com/MattiasFredriksson/io_anim_c3d/archive/master.zip) the latest version of `io_anim_c3d` from source code (intended for latest LTS release, see [release](https://github.com/MattiasFredriksson/io_anim_c3d/releases) section for stable/specific versions).
+2. Open Blender
+3. Open the Edit->Preferences window.
+4. Go to the 'Add-ons' tab.
+5. Click the 'Install...' button.
+6. Navigate to the folder containing the downloaded .zip file and double-click the file.
+7. Enable the addon 'Import-Export: C3D format' in the addon window.
+8. Not there? Use the refresh button, restart blender, google how to install add-ons, or visit [docs.blender.org](https://docs.blender.org/manual/en/latest/editors/preferences/addons.html).
 
 
 # How to Use
@@ -40,14 +27,34 @@ Install in a Blender add-on folder
 
 General guidelines and information how to configure the repository for development.
 
+Development Tools
+-------
+- Visual Studio Code
+- [Blender Development Extension](https://marketplace.visualstudio.com/items?itemName=JacquesLucke.blender-development)
+
+Tests
+-------
+Unittests are available under the 'tests/' folder. To run call:
+
+`tests/run.sh <path or alias to Blender executable>`
+
+Running tests require the addon to be installed to the Blender executable, simplest way to do so is to use the Blender development extension with the same executable as it will configure a symlink to the project, ensuring the test will run with the latest changes to the code.
+
+Unittests are minimal and should focus on testing the addon functionality. For functionality testing the importer go to the underlying .c3d parser [project](https://github.com/MattiasFredriksson/py-c3d).
+
+
 Code Style
 -------
 - Classes should be in PascalCase
 - Variables and functions should be in snake_case
-- Code needs to be pep8 compliant (\_\_init\_\_.py has excemptions due to Blender dependencies).
+- Code needs to be pep8 compliant (\_\_init\_\_.py has exemptions due to Blender dependencies).
 
 Addon Tooltip Style
 -------
 
 - Addon property names should written with the first letter in each word capatilized.
 - Don't forget to exclude the dot (.) at the end of the description as it will be added automatically...
+
+# Further Questions?
+
+If there are any questions or suggestions please visit the [issue board](https://github.com/MattiasFredriksson/io_anim_c3d/issues) and make a ticket, hopefully I will be able to answer questions within some reasonable time frame 😄.
