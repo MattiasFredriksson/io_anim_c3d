@@ -1,6 +1,6 @@
 # C3D File Importer for Blender
 
-Blender addon for importing motion capture data found in .c3d files.
+[Blender](https://www.blender.org/) addon for importing motion capture data found in .c3d files.
 
 # How to Install
 
