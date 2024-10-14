@@ -2,6 +2,8 @@
 
 [Blender](https://www.blender.org/) addon for importing motion capture data found in .c3d files.
 
+![MocapTennis](https://github.com/user-attachments/assets/eab39780-5c87-4145-bb72-d3fcf5454f4c)
+
 # How to Install
 
 1. [Download](https://github.com/MattiasFredriksson/io_anim_c3d/archive/master.zip) the latest version of `io_anim_c3d` from source code (intended for latest LTS release, see [release](https://github.com/MattiasFredriksson/io_anim_c3d/releases) section for stable/specific versions).
