@@ -29,8 +29,8 @@ General guidelines and information how to configure the repository for developme
 
 Development Tools
 -------
-- Visual studio code
-- [Blender development extension](https://marketplace.visualstudio.com/items?itemName=JacquesLucke.blender-development)
+- Visual Studio Code
+- [Blender Development Extension](https://marketplace.visualstudio.com/items?itemName=JacquesLucke.blender-development)
 
 Tests
 -------
