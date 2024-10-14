@@ -2,7 +2,7 @@
 
 [Blender](https://www.blender.org/) addon for importing motion capture data found in .c3d files.
 
-![MocapTennis](https://github.com/user-attachments/assets/eab39780-5c87-4145-bb72-d3fcf5454f4c)
+<img src="https://github.com/user-attachments/assets/eab39780-5c87-4145-bb72-d3fcf5454f4c" width=50% height=50%>
 
 # How to Install
 
