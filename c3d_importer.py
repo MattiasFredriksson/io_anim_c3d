@@ -25,6 +25,7 @@ import mathutils
 import bpy
 import os
 import numpy as np
+from bpy_extras import anim_utils
 from .pyfuncs import islist
 
 
@@ -42,20 +43,19 @@ def load(operator, context, filepath="",
          include_event_markers=False,
          include_empty_labels=False,
          apply_label_mask=True,
-         print_file=False,
-         perf_mon=True):
+         print_file=True):
 
     # Load more modules/packages once the importer is used
     from bpy_extras.io_utils import axis_conversion
     from .c3d_parse_dictionary import C3DParseDictionary
-    from . import perfmon
+    from . perfmon import PerfMon
 
     # Define the action id from the filename
     file_id = os.path.basename(filepath)
     file_name = os.path.splitext(file_id)[0]
 
     # Monitor performance
-    perfmon = perfmon.new_monitor(print_output=perf_mon)
+    perfmon = PerfMon()
     perfmon.level_up('Importing: %s ...' % file_id, True)
 
     # Open file and read .c3d parameter headers
@@ -70,6 +70,7 @@ def load(operator, context, filepath="",
         conv_fac_frame_rate = 1.0
         if adapt_frame_rate:
             conv_fac_frame_rate = bpy.context.scene.render.fps / parser.frame_rate
+            # bpy.data.scenes['Scene'].render.fps = int(parser.frame_rate)
 
         # Conversion factor for length measurements.
         blend_units = 'm'
@@ -107,7 +108,7 @@ def load(operator, context, filepath="",
         # Number of frames [first, last] => +1.
         # first_frame is the frame index to start parsing from.
         # nframes is the number of frames to parse.
-        first_frame = parser.first_frame
+        first_frame = parser.first_frame -1
         nframes = parser.last_frame - first_frame + 1
         perfmon.message('Parsing: %i frames...' % nframes)
 
@@ -128,11 +129,19 @@ def load(operator, context, filepath="",
         if not include_empty_labels:
             clean_empty_fcurves(action)
         # Since we inserted our keyframes in 'FAST' mode, its best to update the fcurves now.
-        for fc in action.fcurves:
-            fc.update()
-        if action.fcurves == 0:
+        # Blender 5.0: access fcurves via channelbag
+        from bpy_extras import anim_utils
+        slot = action.slots[0] if action.slots else None
+        if slot is None:
             remove_action(action)
-            # All samples were either invalid or was previously culled in regard to the channel label.
+            operator.report({'WARNING'}, 'No valid POINT data in file: %s' % filepath)
+            return {'CANCELLED'}
+        channelbag = anim_utils.action_ensure_channelbag_for_slot(action, slot)
+
+        for fc in channelbag.fcurves:
+            fc.update()
+        if len(channelbag.fcurves) == 0:          # was: action.fcurves == 0  (also a bug: should be len())
+            remove_action(action)
             operator.report({'WARNING'}, 'No valid POINT data in file: %s' % filepath)
             return {'CANCELLED'}
 
@@ -144,14 +153,12 @@ def load(operator, context, filepath="",
         arm_obj = None
         bone_radius = bone_size * 0.5
         if create_armature:
-            final_labels = [fc_grp.name for fc_grp in action.groups]
+            final_labels = [fc_grp.name for fc_grp in channelbag.groups]  # was: action.groups
             arm_obj = create_armature_object(context, file_name, 'BBONE')
             add_empty_armature_bones(context, arm_obj, final_labels, bone_size)
-            # Set the width of the bbones.
             for bone in arm_obj.data.bones:
                 bone.bbone_x = bone_radius
                 bone.bbone_z = bone_radius
-            # Set the created action as active for the armature.
             set_action(arm_obj, action, replace=False)
 
         perfmon.level_down("Import finished.")
@@ -189,7 +196,7 @@ def read_data(parser, blen_curves, labels, point_mask, global_orient,
     # Start reading POINT blocks (and analog, but analog signals from force plates etc. are not supported).
     perfmon.level_up('Reading POINT data..', True)
     for i, points, analog in parser.reader.read_frames(copy=False):
-        index = i - first_frame
+        index = i - first_frame -1
         # Apply masked samples.
         points = points[point_mask]
         # Determine valid samples
@@ -221,10 +228,10 @@ def read_data(parser, blen_curves, labels, point_mask, global_orient,
 
         # Iterate valid frames and insert keyframes.
         frame_indices = frame_range[valid_samples[:, label_ind]]
-
+        
         for dim, fc in enumerate(fc_set):
             keyframes = np.empty((nlabel_keys, 2), dtype=np.float32)
-            keyframes[:, 0] = frame_indices * conv_fac_frame_rate
+            keyframes[:, 0] = frame_indices * conv_fac_frame_rate +1 # DAVID +1 BECAUSE THERE WAS A FRAME SHIFT
             keyframes[:, 1] = point_frames[frame_indices, dim, label_ind]
             fc.keyframe_points.foreach_set('co', keyframes.ravel())
 
@@ -273,6 +280,10 @@ def set_action(object, action, replace=True):
         object.animation_data_create()
     if replace or not object.animation_data.action:
         object.animation_data.action = action
+        # Blender 5.0: assigning an action does not auto-assign a slot,
+        # so the object would not be animated without this.
+        if action.slots:
+            object.animation_data.action_slot = action.slots[0]
 
 
 def create_armature_object(context, name, display_type='OCTAHEDRAL'):
@@ -364,19 +375,20 @@ def generate_blend_curves(action, labels, grp_channel_count, fc_data_path_str):
                         'pose.bones["%s"].rotation_euler'
 
     '''
-
     # Convert a single label to an iterable tuple (list).
     if not islist(labels):
         labels = (labels)
 
+    # Blender 5.0: use slot + anim_utils helper to get/create the channelbag.
+    slot = action.slots[0] if action.slots else action.slots.new(id_type='OBJECT', name='Slot')
+    fcurves = anim_utils.action_ensure_channelbag_for_slot(action, slot).fcurves
+
     # Generate channels for each label to hold location information.
     if '%s' not in fc_data_path_str:
-        # No format operator found in the data_path_str used to define F-curves.
-        blen_curves = [action.fcurves.new(fc_data_path_str, index=i, action_group=label)
+        blen_curves = [fcurves.new(fc_data_path_str, index=i, group_name=label)
                        for label in labels for i in range(grp_channel_count)]
     else:
-        # Format operator found, replace it with label associated with the created F-Curve.
-        blen_curves = [action.fcurves.new(fc_data_path_str % label, index=i, action_group=label)
+        blen_curves = [fcurves.new(fc_data_path_str % label, index=i, group_name=label)
                        for label in labels for i in range(grp_channel_count)]
     return blen_curves
 
@@ -388,12 +400,11 @@ def clean_empty_fcurves(action):
     Parameters
     ----
     action:             bpy.types.Action object to clean F-curves.
-
     '''
-    empty_curves = []
-    for curve in action.fcurves:
-        if len(curve.keyframe_points) == 0:
-            empty_curves.append(curve)
-
+    if not action.slots:
+        return
+    slot = action.slots[0]
+    channelbag = anim_utils.action_ensure_channelbag_for_slot(action, slot)
+    empty_curves = [curve for curve in channelbag.fcurves if len(curve.keyframe_points) == 0]
     for curve in empty_curves:
-        action.fcurves.remove(curve)
+        channelbag.fcurves.remove(curve)
