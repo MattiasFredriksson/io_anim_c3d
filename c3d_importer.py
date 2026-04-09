@@ -49,6 +49,7 @@ def load(operator, context, filepath="",
     # Load more modules/packages once the importer is used
     from bpy_extras.io_utils import axis_conversion
     from .c3d_parse_dictionary import C3DParseDictionary
+    
     from . import perfmon
     
     # Define the action id from the filename
@@ -108,7 +109,7 @@ def load(operator, context, filepath="",
         # Number of frames [first, last] => +1.
         # first_frame is the frame index to start parsing from.
         # nframes is the number of frames to parse.
-        first_frame = parser.first_frame -1
+        first_frame = parser.first_frame
         nframes = parser.last_frame - first_frame + 1
         perfmon.message('Parsing: %i frames...' % nframes)
 
@@ -154,7 +155,7 @@ def load(operator, context, filepath="",
         arm_obj = None
         bone_radius = bone_size * 0.5
         if create_armature:
-            final_labels = [fc_grp.name for fc_grp in channelbag.groups]  # was: action.groups
+            final_labels = [fc_grp.name for fc_grp in channelbag.groups]
             arm_obj = create_armature_object(context, file_name, 'BBONE')
             add_empty_armature_bones(context, arm_obj, final_labels, bone_size)
             # Set the width of the bbones.
@@ -231,7 +232,6 @@ def read_data(parser, blen_curves, labels, point_mask, global_orient,
 
         # Iterate valid frames and insert keyframes.
         frame_indices = frame_range[valid_samples[:, label_ind]]
-        
         for dim, fc in enumerate(fc_set):
             keyframes = np.empty((nlabel_keys, 2), dtype=np.float32)
             keyframes[:, 0] = frame_indices * conv_fac_frame_rate
@@ -298,7 +298,6 @@ def create_armature_object(context, name, display_type='OCTAHEDRAL'):
     name:           Name for the object
     display_type:   Display type for the armature bones.
     '''
-    
     arm_data = bpy.data.armatures.new(name=name)
     arm_data.display_type = display_type
 
