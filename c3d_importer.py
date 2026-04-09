@@ -43,21 +43,19 @@ def load(operator, context, filepath="",
          include_event_markers=False,
          include_empty_labels=False,
          apply_label_mask=True,
-         print_file=False,
-         perf_mon=True):
+         print_file=True):
 
     # Load more modules/packages once the importer is used
     from bpy_extras.io_utils import axis_conversion
     from .c3d_parse_dictionary import C3DParseDictionary
-    
-    from . import perfmon
-    
+    from . perfmon import PerfMon
+
     # Define the action id from the filename
     file_id = os.path.basename(filepath)
     file_name = os.path.splitext(file_id)[0]
 
     # Monitor performance
-    perfmon = perfmon.new_monitor(print_output=perf_mon)
+    perfmon = PerfMon()
     perfmon.level_up('Importing: %s ...' % file_id, True)
 
     # Open file and read .c3d parameter headers
@@ -72,6 +70,7 @@ def load(operator, context, filepath="",
         conv_fac_frame_rate = 1.0
         if adapt_frame_rate:
             conv_fac_frame_rate = bpy.context.scene.render.fps / parser.frame_rate
+            # bpy.data.scenes['Scene'].render.fps = int(parser.frame_rate)
 
         # Conversion factor for length measurements.
         blend_units = 'm'
@@ -109,7 +108,7 @@ def load(operator, context, filepath="",
         # Number of frames [first, last] => +1.
         # first_frame is the frame index to start parsing from.
         # nframes is the number of frames to parse.
-        first_frame = parser.first_frame
+        first_frame = parser.first_frame -1
         nframes = parser.last_frame - first_frame + 1
         perfmon.message('Parsing: %i frames...' % nframes)
 
@@ -141,9 +140,8 @@ def load(operator, context, filepath="",
 
         for fc in channelbag.fcurves:
             fc.update()
-        if len(channelbag.fcurves) == 0:
+        if len(channelbag.fcurves) == 0:          # was: action.fcurves == 0  (also a bug: should be len())
             remove_action(action)
-            # All samples were either invalid or was previously culled in regard to the channel label.
             operator.report({'WARNING'}, 'No valid POINT data in file: %s' % filepath)
             return {'CANCELLED'}
 
@@ -155,14 +153,12 @@ def load(operator, context, filepath="",
         arm_obj = None
         bone_radius = bone_size * 0.5
         if create_armature:
-            final_labels = [fc_grp.name for fc_grp in channelbag.groups]
+            final_labels = [fc_grp.name for fc_grp in channelbag.groups]  # was: action.groups
             arm_obj = create_armature_object(context, file_name, 'BBONE')
             add_empty_armature_bones(context, arm_obj, final_labels, bone_size)
-            # Set the width of the bbones.
             for bone in arm_obj.data.bones:
                 bone.bbone_x = bone_radius
                 bone.bbone_z = bone_radius
-            # Set the created action as active for the armature.
             set_action(arm_obj, action, replace=False)
 
         perfmon.level_down("Import finished.")
@@ -200,7 +196,7 @@ def read_data(parser, blen_curves, labels, point_mask, global_orient,
     # Start reading POINT blocks (and analog, but analog signals from force plates etc. are not supported).
     perfmon.level_up('Reading POINT data..', True)
     for i, points, analog in parser.reader.read_frames(copy=False):
-        index = i - first_frame
+        index = i - first_frame -1
         # Apply masked samples.
         points = points[point_mask]
         # Determine valid samples
@@ -232,9 +228,10 @@ def read_data(parser, blen_curves, labels, point_mask, global_orient,
 
         # Iterate valid frames and insert keyframes.
         frame_indices = frame_range[valid_samples[:, label_ind]]
+        
         for dim, fc in enumerate(fc_set):
             keyframes = np.empty((nlabel_keys, 2), dtype=np.float32)
-            keyframes[:, 0] = frame_indices * conv_fac_frame_rate
+            keyframes[:, 0] = frame_indices * conv_fac_frame_rate +1 # DAVID +1 BECAUSE THERE WAS A FRAME SHIFT
             keyframes[:, 1] = point_frames[frame_indices, dim, label_ind]
             fc.keyframe_points.foreach_set('co', keyframes.ravel())
 
@@ -388,11 +385,9 @@ def generate_blend_curves(action, labels, grp_channel_count, fc_data_path_str):
 
     # Generate channels for each label to hold location information.
     if '%s' not in fc_data_path_str:
-        # No format operator found in the data_path_str used to define F-curves.
         blen_curves = [fcurves.new(fc_data_path_str, index=i, group_name=label)
                        for label in labels for i in range(grp_channel_count)]
     else:
-        # Format operator found, replace it with label associated with the created F-Curve.
         blen_curves = [fcurves.new(fc_data_path_str % label, index=i, group_name=label)
                        for label in labels for i in range(grp_channel_count)]
     return blen_curves
