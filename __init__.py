@@ -246,13 +246,13 @@ class ImportC3D(bpy.types.Operator, ImportHelper):
                 if len(failed) == len(self.files):
                     self.report(
                         {'ERROR'},
-                        'Failed to load any of the .bvh files(s):%s' % failed_files
+                        'Failed to load any of the .c3d files(s):%s' % failed_files
                         )
                     return {'CANCELLED'}
                 else:
                     self.report(
                         {'WARNING'},
-                        'Failed loading .bvh files(s):%s' % failed_files
+                        'Failed loading .c3d files(s):%s' % failed_files
                         )
             return {'FINISHED'}
         else:
