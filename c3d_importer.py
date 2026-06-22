@@ -239,7 +239,7 @@ def read_data(parser, blen_curves, labels, point_mask, global_orient,
 
 
 def create_action_with_slot(action_name, slot_name=None, object=None, fake_user=False):
-    ''' Create new action.
+    ''' Create a new Action with an empty ActionSlot.
 
     Params:
     -----
@@ -247,6 +247,10 @@ def create_action_with_slot(action_name, slot_name=None, object=None, fake_user=
     slot_name:      Optional Name for the action slot, defaults to using the `action_name`.
     object:         Set the action as the active animation data for the object.
     fake_user:      Set the 'Fake User' flag for the action.
+
+    Returns:
+    ------
+    Pair (tuple) containing the new Action and its ActionSlot.
     '''
     if not isinstance(action_name, str) or len(action_name) == 0:
         raise ValueError("Expected action name to be non-empty string, was: %s" % action_name) 
