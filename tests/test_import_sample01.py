@@ -20,7 +20,7 @@ class ImportC3DTestSample01(unittest.TestCase):
         ]
 
     def setUpClass():
-        from test.zipload import Zipload
+        from tests.zipload import Zipload
         Zipload.download_and_extract()
 
         objs = []

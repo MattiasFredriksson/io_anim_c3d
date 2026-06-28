@@ -9,7 +9,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 class ImportC3DTestVicon(unittest.TestCase):
 
     def setUpClass():
-        from test.zipload import Zipload
+        from tests.zipload import Zipload
         Zipload.download_and_extract()
 
         FILEPATH = Zipload.get_c3d_path('sample00', 'Vicon Motion Systems', 'TableTennis.c3d')
