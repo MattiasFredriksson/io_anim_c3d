@@ -5,6 +5,10 @@
 cd "${0%/*}"
 BLENDER_EXE=$1
 
+if [ -z "$BLENDER_EXE" ]; then
+    echo "Missing Blender Executable argument, run script ushing .../run.sh <blender_exe_path>"
+fi
+
 echo "Running tests using: $BLENDER_EXE"
 
 STATUS=0
