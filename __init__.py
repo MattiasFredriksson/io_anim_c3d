@@ -24,8 +24,8 @@
 bl_info = {
     "name": "C3D format",
     "author": "Mattias Fredriksson",
-    "version": (0, 1, 0),
-    "blender": (2, 83, 0),
+    "version": (3, 0, 0),
+    "blender": (5, 0, 0),
     "location": "File > Import",
     "description": "Imports C3D Optical Motion Capture (.c3d) files, animated Point Cloud data",
     "warning": "",
