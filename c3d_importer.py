@@ -25,7 +25,6 @@ import mathutils
 import bpy
 import os
 import numpy as np
-from bpy_extras import anim_utils
 from .pyfuncs import islist
 
 
@@ -46,12 +45,12 @@ def load(operator, context, filepath="",
          print_file=False,
          perf_mon=True):
 
-    # Load more modules/packages once the importer is used
+    # Load additional modules/packages once the importer is used
     from bpy_extras.io_utils import axis_conversion
+    from bpy_extras import anim_utils
     from .c3d_parse_dictionary import C3DParseDictionary
-    
     from . import perfmon
-    
+
     # Define the action id from the filename
     file_id = os.path.basename(filepath)
     file_name = os.path.splitext(file_id)[0]
@@ -116,8 +115,9 @@ def load(operator, context, filepath="",
         # 1. Create an action to hold keyframe data.
         # 2. Generate location (x,y,z) F-Curves for each label.
         # 3. Format the curve list in sets of 3, each set associate with the x/y/z channels.
-        action = create_action(file_name, fake_user=fake_user)
-        blen_curves_arr = generate_blend_curves(action, labels, 3, 'pose.bones["%s"].location')
+        action, slot = create_action_with_slot(file_name, fake_user=fake_user)
+        channelbag = anim_utils.action_ensure_channelbag_for_slot(action, slot)
+        blen_curves_arr = generate_blend_curves(channelbag, labels, 3, 'pose.bones["%s"].location')
         blen_curves = np.array(blen_curves_arr).reshape(nlabels, 3)
 
         # Load
@@ -128,24 +128,15 @@ def load(operator, context, filepath="",
 
         # Remove labels with no valid keyframes.
         if not include_empty_labels:
-            clean_empty_fcurves(action)
-        # Since we inserted our keyframes in 'FAST' mode, its best to update the fcurves now.
-        # Blender 5.0: access fcurves via channelbag
-        from bpy_extras import anim_utils
-        slot = action.slots[0] if action.slots else None
-        if slot is None:
-            remove_action(action)
-            operator.report({'WARNING'}, 'No valid POINT data in file: %s' % filepath)
-            return {'CANCELLED'}
-        channelbag = anim_utils.action_ensure_channelbag_for_slot(action, slot)
-
-        for fc in channelbag.fcurves:
-            fc.update()
+            clean_empty_fcurves(channelbag)
         if len(channelbag.fcurves) == 0:
             remove_action(action)
             # All samples were either invalid or was previously culled in regard to the channel label.
             operator.report({'WARNING'}, 'No valid POINT data in file: %s' % filepath)
             return {'CANCELLED'}
+        # Since we inserted our keyframes in 'FAST' mode, its best to update the fcurves now.
+        for fc in channelbag.fcurves:
+            fc.update()
 
         # Parse events in the file (if specified).
         if include_event_markers:
@@ -163,7 +154,7 @@ def load(operator, context, filepath="",
                 bone.bbone_x = bone_radius
                 bone.bbone_z = bone_radius
             # Set the created action as active for the armature.
-            set_action(arm_obj, action, replace=False)
+            set_action_slot(arm_obj, action, slot, replace=False)
 
         perfmon.level_down("Import finished.")
 
@@ -247,23 +238,33 @@ def read_data(parser, blen_curves, labels, point_mask, global_orient,
     perfmon.level_down('Keyframing Done.')
 
 
-def create_action(action_name, object=None, fake_user=False):
-    ''' Create new action.
+def create_action_with_slot(action_name, slot_name=None, object=None, fake_user=False):
+    ''' Create a new Action with an empty ActionSlot.
 
     Params:
     -----
     action_name:    Name for the action
+    slot_name:      Optional Name for the action slot, defaults to using the `action_name`.
     object:         Set the action as the active animation data for the object.
     fake_user:      Set the 'Fake User' flag for the action.
-    '''
 
+    Returns:
+    ------
+    Pair (tuple) containing the new Action and its ActionSlot.
+    '''
+    if not isinstance(action_name, str) or len(action_name) == 0:
+        raise ValueError("Expected action name to be non-empty string, was: %s" % action_name) 
+    if slot_name is None:
+        slot_name = action_name
     action = bpy.data.actions.new(action_name)
+    slot = action.slots.new(id_type='OBJECT', name=slot_name)
     action.use_fake_user = fake_user
 
     # If none yet assigned, assign this action to id_data.
     if object:
-        set_action(object, action, replace=False)
-    return action
+        set_action_slot(object, action, slot, replace=False)
+    return action, slot
+
 
 
 def remove_action(action):
@@ -272,21 +273,19 @@ def remove_action(action):
     bpy.data.actions.remove(action)
 
 
-def set_action(object, action, replace=True):
+def set_action_slot(object, action, slot, replace=True):
     ''' Set the action associated with the object.
     -----
-    object:    Object for which the animation should be set.
-    action:    Action to set for the object.
-    replace:   If False, existing action set for the object will not be replaced.
+    object:     Object for which the animation should be set.
+    action:     Action to set as active for the object.
+    slot:       ActionSlot to set as active for the object.
+    replace:    If False, already assigned action and slot will not be replaced.
     '''
     if not object.animation_data:
         object.animation_data_create()
     if replace or not object.animation_data.action:
         object.animation_data.action = action
-        # Blender 5.0: assigning an action does not auto-assign a slot,
-        # so the object would not be animated without this.
-        if action.slots:
-            object.animation_data.action_slot = action.slots[0]
+        object.animation_data.action_slot = slot
 
 
 def create_armature_object(context, name, display_type='OCTAHEDRAL'):
@@ -354,13 +353,13 @@ def add_empty_armature_bones(context, arm_obj, bone_names, length=0.1):
     bpy.ops.object.mode_set(mode='OBJECT')
 
 
-def generate_blend_curves(action, labels, grp_channel_count, fc_data_path_str):
+def generate_blend_curves(channelbag, labels, grp_channel_count, fc_data_path_str):
     '''
     Generate F-Curves for the action.
 
     Parameters
     ----
-    action:             bpy.types.Action object to generate F-curves for.
+    channelbag:         bpy.types.ActionChannelbag object to generate F-curves for.
     labels:             String label(s) for generated F-Curves, an action group is generated for each label.
     grp_channel_count:  Number of channels generated for each label (group).
     fc_data_path_str:   Unformated data path string used to define the F-Curve data path. If a string format
@@ -382,34 +381,26 @@ def generate_blend_curves(action, labels, grp_channel_count, fc_data_path_str):
     if not islist(labels):
         labels = (labels)
 
-    # Blender 5.0: use slot + anim_utils helper to get/create the channelbag.
-    slot = action.slots[0] if action.slots else action.slots.new(id_type='OBJECT', name='Slot')
-    fcurves = anim_utils.action_ensure_channelbag_for_slot(action, slot).fcurves
-
     # Generate channels for each label to hold location information.
     if '%s' not in fc_data_path_str:
         # No format operator found in the data_path_str used to define F-curves.
-        blen_curves = [fcurves.new(fc_data_path_str, index=i, group_name=label)
+        blen_curves = [channelbag.fcurves.new(fc_data_path_str, index=i, group_name=label)
                        for label in labels for i in range(grp_channel_count)]
     else:
         # Format operator found, replace it with label associated with the created F-Curve.
-        blen_curves = [fcurves.new(fc_data_path_str % label, index=i, group_name=label)
+        blen_curves = [channelbag.fcurves.new(fc_data_path_str % label, index=i, group_name=label)
                        for label in labels for i in range(grp_channel_count)]
     return blen_curves
 
 
-def clean_empty_fcurves(action):
+def clean_empty_fcurves(channelbag):
     '''
     Remove any F-Curve in the action with no keyframes.
 
     Parameters
     ----
-    action:             bpy.types.Action object to clean F-curves.
+    channelbag:             bpy.types.ActionChannelbag object to clean F-curves from.
     '''
-    if not action.slots:
-        return
-    slot = action.slots[0]
-    channelbag = anim_utils.action_ensure_channelbag_for_slot(action, slot)
     empty_curves = [curve for curve in channelbag.fcurves if len(curve.keyframe_points) == 0]
     for curve in empty_curves:
         channelbag.fcurves.remove(curve)
