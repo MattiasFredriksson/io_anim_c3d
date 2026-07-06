@@ -382,14 +382,13 @@ def generate_blend_curves(channelbag, labels, grp_channel_count, fc_data_path_st
         labels = (labels)
 
     # Generate channels for each label to hold location information.
-    fcurves = channelbag.fcurves
     if '%s' not in fc_data_path_str:
         # No format operator found in the data_path_str used to define F-curves.
-        blen_curves = [fcurves.new(fc_data_path_str, index=i, group_name=label)
+        blen_curves = [channelbag.fcurves.new(fc_data_path_str, index=i, group_name=label)
                        for label in labels for i in range(grp_channel_count)]
     else:
         # Format operator found, replace it with label associated with the created F-Curve.
-        blen_curves = [fcurves.new(fc_data_path_str % label, index=i, group_name=label)
+        blen_curves = [channelbag.fcurves.new(fc_data_path_str % label, index=i, group_name=label)
                        for label in labels for i in range(grp_channel_count)]
     return blen_curves
 
