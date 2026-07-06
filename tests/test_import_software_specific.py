@@ -9,7 +9,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 class ImportC3DTestVicon(unittest.TestCase):
 
     def setUpClass():
-        from test.zipload import Zipload
+        from tests.zipload import Zipload
+        from bpy_extras import anim_utils
+
         Zipload.download_and_extract()
 
         FILEPATH = Zipload.get_c3d_path('sample00', 'Vicon Motion Systems', 'TableTennis.c3d')
@@ -19,19 +21,21 @@ class ImportC3DTestVicon(unittest.TestCase):
         # Fetch loaded objects
         obj = bpy.context.selected_objects[0]
         ImportC3DTestVicon.obj = obj
-        ImportC3DTestVicon.action = obj.animation_data.action
+        action = obj.animation_data.action
+        action_slot = obj.animation_data.action_slot
+        ImportC3DTestVicon.channelbag = anim_utils.action_get_channelbag_for_slot(action, action_slot)
 
     def test_A_channel_count(self):
         ''' Verify number action has channels
         '''
         EXPECTED = 243*3
-        ch_count = len(self.action.fcurves)
+        ch_count = len(self.channelbag.fcurves)
         self.assertEqual(ch_count, EXPECTED)
 
     def test_B_keyframe_count(self):
         ''' Verify each channel has keyframes
         '''
-        for fc in ImportC3DTestVicon.action.fcurves:
+        for fc in ImportC3DTestVicon.channelbag.fcurves:
             self.assertGreater(len(fc.keyframe_points), 0)
 
     def test_C_tracker_labels(self):
@@ -89,7 +93,7 @@ class ImportC3DTestVicon(unittest.TestCase):
                   'Player01:CentreOfMass', 'Player01:CentreOfMassFloor', 'Player01:CentreOfMass',
                   'Player01:CentreOfMassFloor']
 
-        names = [fc_grp.name for fc_grp in ImportC3DTestVicon.action.groups]
+        names = [fc_grp.name for fc_grp in ImportC3DTestVicon.channelbag.groups]
         for label in LABELS:
             self.assertIn(label, names)
 
