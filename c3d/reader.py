@@ -60,9 +60,18 @@ class Reader(Manager):
         buf = seek_param_section_header()
 
         start_byte = self._handle.tell()
+        # The declared parameter block count cannot be trusted as
+        # files may exceed 255 blocks and some writers declare it wrong
+        data_span_blocks = self._header.data_block - self._header.parameter_block
+        parameter_blocks = max(parameter_blocks, data_span_blocks)
         endbyte = start_byte + 512 * parameter_blocks - 4
         while self._handle.tell() < endbyte:
-            chars_in_name, group_id = struct.unpack('bb', self._handle.read(2))
+            head_bytes = self._handle.read(2)
+            if len(head_bytes) < 2:
+                # EOF before the section bound: tolerate the truncation, the
+                # parameters read so far remain usable.
+                break
+            chars_in_name, group_id = struct.unpack('bb', head_bytes)
             if group_id == 0 or chars_in_name == 0:
                 # we've reached the end of the parameter section.
                 break
